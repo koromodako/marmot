@@ -98,8 +98,15 @@ async def _messages_from_request(request):
 
 async def _forward_messages_from(request, pubsub, stop_event):
     async with sse_response(request, sep='\r\n') as resp:
+        # set ping interval
+        resp.ping_interval = 5
         while True:
-            # exit infinite loop if stop event is set
+            # internal ping task ends prematurely meaning that the client
+            # closed the connection, exit
+            # not nice, pending https://github.com/aio-libs/aiohttp-sse/issues/391
+            if resp._ping_task.done():
+                break
+            # server is shutting down, notify the client and exit
             if stop_event.is_set():
                 await resp.send('reset', event='reset')
                 break
