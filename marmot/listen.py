@@ -1,7 +1,8 @@
 """Marmot client
 """
+from signal import SIGINT, SIGTERM
 from pathlib import Path
-from asyncio import new_event_loop
+from asyncio import Event, new_event_loop
 from argparse import ArgumentParser
 from aiohttp import ClientSession, ClientTimeout
 from . import Marmot
@@ -11,7 +12,7 @@ from .helper.logging import LOGGER
 
 
 BANNER = f"Marmot Listen {version}"
-
+STOP_EVENT = Event()
 
 def _process_message_cb(message):
     """"""
@@ -25,12 +26,21 @@ async def _async_listen(args):
         base_url=config.client.url, timeout=ClientTimeout()
     ) as http_client:
         marmot = Marmot(config, http_client)
-        await marmot.listen(args.channel, _process_message_cb)
+        await marmot.listen(args.channel, _process_message_cb, STOP_EVENT)
+
+
+def _termination_handler():
+    print()
+    LOGGER.info("terminating, please wait...")
+    STOP_EVENT.set()
 
 
 def _listen(args):
     """"""
+    STOP_EVENT.clear()
     loop = new_event_loop()
+    loop.add_signal_handler(SIGINT, _termination_handler)
+    loop.add_signal_handler(SIGTERM, _termination_handler)
     loop.run_until_complete(_async_listen(args))
     loop.close()
 

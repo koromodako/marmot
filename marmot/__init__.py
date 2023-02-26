@@ -25,7 +25,7 @@ class Marmot:
         self._config = config
         self._http_client = http_client
 
-    async def listen(self, channel, message_processing_cb):
+    async def listen(self, channel, message_processing_cb, stop_event):
         """Listen in a channel"""
         url = f'/listen/{channel}'
         guid = self._config.client.guid
@@ -40,7 +40,7 @@ class Marmot:
             if resp.status != 200:
                 LOGGER.error("server sent status code: %s", resp.status)
                 return
-            async for evt in event_source_stream(resp):
+            async for evt in event_source_stream(resp, stop_event):
                 event = evt.event.decode()
                 if event == 'reset':
                     LOGGER.warning("server sent a reset notification.")

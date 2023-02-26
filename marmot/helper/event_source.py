@@ -28,10 +28,10 @@ def parse_event(event_lines):
     return event
 
 
-async def event_source_stream(resp):
+async def event_source_stream(resp, stop_event):
     """Yield events from event source stream"""
     event_lines = []
-    while True:
+    while not stop_event.is_set():
         line = (await resp.content.readline()).rstrip()
         if line:
             if line.startswith(b':'):
