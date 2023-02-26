@@ -3,8 +3,7 @@
 from pathlib import Path
 from asyncio import new_event_loop
 from argparse import ArgumentParser
-from aiohttp import ClientSession
-from . import Marmot, MarmotMessage
+from . import Marmot, MarmotRole, MarmotMessage
 from .server import MarmotMessageLevel
 from .__version__ import version
 from .helper.config import MarmotConfig, MarmotConfigError
@@ -14,27 +13,29 @@ from .helper.logging import LOGGER
 BANNER = f"Marmot Whistle {version}"
 
 
+async def _async_whistle(args):
+    config = MarmotConfig.from_filepath(args.config)
+    if not config.client:
+        LOGGER.error("cannot find client configuration in: %s", args.config)
+        return
+    async with Marmot.create_http_client(
+        MarmotRole.WHISTLER, config
+    ) as http_client:
+        marmot = Marmot(config, http_client)
+        published, unauthorized = await marmot.whistle(
+            [
+                MarmotMessage(
+                    channel=args.channel,
+                    content=args.message,
+                    level=args.level,
+                )
+            ]
+        )
+        print(f"published: {published}")
+        print(f"unauthorized: {unauthorized}")
+
+
 def _whistle(args):
-    """"""
-
-    async def _async_whistle(args):
-        """"""
-        config = MarmotConfig.from_filepath(args.config)
-        async with ClientSession(base_url=config.client.url) as http_client:
-            marmot = Marmot(config, http_client)
-            published, unauthorized = await marmot.whistle(
-                [
-                    MarmotMessage(
-                        channel=args.channel,
-                        content=args.message,
-                        level=args.level,
-                    )
-                ]
-            )
-            print(f"published: {published}")
-            print(f"unauthorized: {unauthorized}")
-
-    # _whistle implementation
     loop = new_event_loop()
     loop.run_until_complete(_async_whistle(args))
     loop.close()

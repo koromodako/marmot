@@ -23,6 +23,7 @@ DEFAULT_MARMOT_PORT = 1758
 DEFAULT_MARMOT_URL = URL.build(
     scheme='http', host=DEFAULT_MARMOT_HOST, port=DEFAULT_MARMOT_PORT
 )
+DEFAULT_MARMOT_CAPATH = Path.home() / '.config' / 'marmot' / 'ca.pem'
 
 
 class MarmotConfigError(Exception):
@@ -207,6 +208,7 @@ class MarmotClientConfig:
 
     guid: str
     url: URL
+    capath: Path
     prikey: MarmotPrivateKey
 
     @classmethod
@@ -217,6 +219,7 @@ class MarmotClientConfig:
         return cls(
             guid=dct['guid'],
             url=URL(dct.get('url', str(DEFAULT_MARMOT_URL))),
+            capath=Path(dct.get('capath', str(DEFAULT_MARMOT_CAPATH))),
             prikey=load_marmot_private_key(dct['prikey']),
         )
 
@@ -225,6 +228,7 @@ class MarmotClientConfig:
         return {
             "guid": self.guid,
             "url": str(self.url),
+            "capath": str(self.capath),
             "prikey": dump_marmot_private_key(self.prikey),
         }
 

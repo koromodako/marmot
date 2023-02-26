@@ -4,8 +4,7 @@ from signal import SIGINT, SIGTERM
 from pathlib import Path
 from asyncio import Event, new_event_loop
 from argparse import ArgumentParser
-from aiohttp import ClientSession, ClientTimeout
-from . import Marmot
+from . import Marmot, MarmotRole
 from .__version__ import version
 from .helper.config import MarmotConfig, MarmotConfigError
 from .helper.logging import LOGGER
@@ -16,15 +15,16 @@ STOP_EVENT = Event()
 
 
 def _process_message_cb(message):
-    """"""
     print(message)
 
 
 async def _async_listen(args):
-    """"""
     config = MarmotConfig.from_filepath(args.config)
-    async with ClientSession(
-        base_url=config.client.url, timeout=ClientTimeout()
+    if not config.client:
+        LOGGER.error("cannot find client configuration in: %s", args.config)
+        return
+    async with Marmot.create_http_client(
+        MarmotRole.LISTENER, config
     ) as http_client:
         marmot = Marmot(config, http_client)
         await marmot.listen(args.channel, _process_message_cb, STOP_EVENT)
@@ -37,7 +37,6 @@ def _termination_handler():
 
 
 def _listen(args):
-    """"""
     STOP_EVENT.clear()
     loop = new_event_loop()
     loop.add_signal_handler(SIGINT, _termination_handler)

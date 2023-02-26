@@ -21,6 +21,7 @@ from .helper.config import (
     DEFAULT_MARMOT_HOST,
     DEFAULT_MARMOT_PORT,
     DEFAULT_MARMOT_URL,
+    DEFAULT_MARMOT_CAPATH,
 )
 from .helper.crypto import generate_marmot_private_key, dump_marmot_public_key
 from .helper.logging import LOGGER
@@ -43,6 +44,12 @@ def _init_client(args):
         guid=str(uuid4()),
         url=Prompt.ask(
             "please enter marmot server url", default=str(DEFAULT_MARMOT_URL)
+        ),
+        capath=Path(
+            Prompt.ask(
+                "please enter marmot server CA path",
+                default=str(DEFAULT_MARMOT_CAPATH),
+            )
         ),
         prikey=generate_marmot_private_key(),
     )

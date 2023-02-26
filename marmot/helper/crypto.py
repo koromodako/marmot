@@ -1,6 +1,9 @@
 """Marmot cryptographic operations helper
 """
+import typing as t
+from ssl import SSLContext, Purpose, create_default_context
 from base64 import b64encode, b64decode
+from pathlib import Path
 from getpass import getpass
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.hashes import Hash, SHA256
@@ -17,6 +20,15 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PrivateKey as MarmotPrivateKey,
 )
 from .logging import LOGGER
+
+
+def create_marmot_ssl_context(capath: Path) -> t.Optional[SSLContext]:
+    """Create SSL context for marmot client"""
+    if not capath.is_file():
+        LOGGER.error("cannot find CA path: %s", capath)
+        return None
+    cadata = capath.read_text()
+    return create_default_context(purpose=Purpose.SERVER_AUTH, cadata=cadata)
 
 
 def load_marmot_public_key(b64_der_data: str) -> MarmotPublicKey:

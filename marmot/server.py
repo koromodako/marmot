@@ -258,10 +258,14 @@ def app():
     webapp['config'] = config
     webapp['listen_sem'] = Semaphore(redis_max_connections - 1)
     webapp['stop_event'] = Event()
+
     webapp.add_routes(
         [
-            web.get('/listen/{channel}', _listen),
-            web.post('/whistle', _whistle),
+            method(pattern, handler)
+            for pattern, method, handler in [
+                ('/api/listen/{channel}', web.get, _listen),
+                ('/api/whistle', web.post, _whistle),
+            ]
         ]
     )
     webapp.on_startup.append(_on_startup)
