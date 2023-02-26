@@ -37,9 +37,7 @@ def load_marmot_private_key(b64_der_data: str) -> MarmotPrivateKey:
     passphrase = getpass("private key passphrase please: ")
     if not passphrase:
         passphrase = None
-    prikey = load_der_private_key(
-        b64decode(b64_der_data), passphrase.encode()
-    )
+    prikey = load_der_private_key(b64decode(b64_der_data), passphrase.encode())
     LOGGER.info("passphrase is correct.")
     return prikey
 

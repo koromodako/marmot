@@ -259,9 +259,7 @@ class MarmotConfig:
                 client=MarmotClientConfig.from_dict(dct.get('client')),
             )
         except ValueError as exc:
-            raise MarmotConfigError(
-                "wrong passphrase!"
-            ) from exc
+            raise MarmotConfigError("wrong passphrase!") from exc
         except KeyError as exc:
             raise MarmotConfigError(
                 f"cannot decode configuration file: {filepath}"

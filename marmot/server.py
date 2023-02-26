@@ -2,7 +2,7 @@
 """
 from enum import Enum
 from uuid import uuid4
-from json import JSONDecodeError, dumps
+from json import dumps
 from asyncio import Semaphore, Event, sleep
 from pathlib import Path
 from argparse import ArgumentParser
@@ -83,9 +83,7 @@ class MarmotAPIMessage:
 
     def verify(self, pubkey: MarmotPublicKey):
         """Verify message signature"""
-        return verify_marmot_data_digest(
-            pubkey, self.digest, self.signature
-        )
+        return verify_marmot_data_digest(pubkey, self.digest, self.signature)
 
 
 async def _messages_from_request(request):
@@ -195,7 +193,9 @@ async def _whistle(request):
             ),
         )
         published.append(message.guid)
-    return web.json_response({'published': published, 'unauthorized': unauthorized})
+    return web.json_response(
+        {'published': published, 'unauthorized': unauthorized}
+    )
 
 
 def _parse_args():
@@ -226,6 +226,7 @@ async def _on_cleanup(webapp):
     LOGGER.info("cleaning up...")
     await webapp['redis'].close()
     await sleep(1)
+
 
 def app():
     """Application entrypoint"""

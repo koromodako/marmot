@@ -34,7 +34,7 @@ class Marmot:
             'X-Marmot-Signature': sign_marmot_data_digest(
                 self._config.client.prikey,
                 hash_marmot_data(':'.join([guid, channel]).encode()),
-            )
+            ),
         }
         async with self._http_client.get(url, headers=headers) as resp:
             if resp.status != 200:

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 @dataclass
 class Event:
     """Event"""
+
     id_: t.Optional[bytes] = None
     event: t.Optional[bytes] = None
     data: bytes = b''

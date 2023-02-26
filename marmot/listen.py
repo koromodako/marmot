@@ -14,6 +14,7 @@ from .helper.logging import LOGGER
 BANNER = f"Marmot Listen {version}"
 STOP_EVENT = Event()
 
+
 def _process_message_cb(message):
     """"""
     print(message)

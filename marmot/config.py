@@ -110,9 +110,13 @@ def _show_server(args):
     table.add_row("host", config.server.host)
     table.add_row("port", str(config.server.port))
     table.add_row("redis.url", config.server.redis.url)
-    table.add_row("redis.max_connections", str(config.server.redis.max_connections))
+    table.add_row(
+        "redis.max_connections", str(config.server.redis.max_connections)
+    )
     CONSOLE.print(table)
-    table = Table(title="Marmot Server Declared Clients", box=ROUNDED, expand=True)
+    table = Table(
+        title="Marmot Server Declared Clients", box=ROUNDED, expand=True
+    )
     table.add_column("GUID")
     table.add_column("Public Key")
     for guid, pubkey in config.server.clients.items():
@@ -127,7 +131,9 @@ def _show_server(args):
         whistlers_node = channel_node.add("whistlers")
         for whistler in conf.whistlers:
             whistlers_node.add(whistler)
-    CONSOLE.print(Panel(root_node, title="Marmot Server Declared Channels", box=ROUNDED))
+    CONSOLE.print(
+        Panel(root_node, title="Marmot Server Declared Channels", box=ROUNDED)
+    )
 
 
 def _add_client(args):
