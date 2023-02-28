@@ -6,7 +6,7 @@ from json import loads
 from dataclasses import dataclass
 from aiohttp import TCPConnector, ClientTimeout, ClientSession
 from rich.prompt import Confirm
-from .server import MarmotAPIMessage, MarmotMessageLevel
+from .helper.api import MarmotAPIMessage, MarmotMessageLevel
 from .helper.crypto import (
     hash_marmot_data,
     sign_marmot_data_digest,
@@ -53,7 +53,11 @@ class Marmot:
             if is_secure
             else None
         )
-        timeout = ClientTimeout() if role == MarmotRole.LISTENER else None
+        timeout = (
+            ClientTimeout()
+            if role == MarmotRole.LISTENER
+            else ClientTimeout(total=60)
+        )
         connector = TCPConnector(ssl=sslctx)
         return ClientSession(
             connector=connector,
@@ -106,4 +110,4 @@ class Marmot:
             '/api/whistle', json=payload
         ) as resp:
             body = await resp.json()
-            return body['published'], body['unauthorized']
+            return body['published']

@@ -4,8 +4,8 @@ from pathlib import Path
 from asyncio import new_event_loop
 from argparse import ArgumentParser
 from . import Marmot, MarmotRole, MarmotMessage
-from .server import MarmotMessageLevel
 from .__version__ import version
+from .helper.api import MarmotMessageLevel
 from .helper.config import MarmotConfig, MarmotConfigError
 from .helper.logging import LOGGER
 
@@ -22,7 +22,7 @@ async def _async_whistle(args):
         MarmotRole.WHISTLER, config
     ) as http_client:
         marmot = Marmot(config, http_client)
-        published, unauthorized = await marmot.whistle(
+        published = await marmot.whistle(
             [
                 MarmotMessage(
                     channel=args.channel,
@@ -32,7 +32,6 @@ async def _async_whistle(args):
             ]
         )
         print(f"published: {published}")
-        print(f"unauthorized: {unauthorized}")
 
 
 def _whistle(args):

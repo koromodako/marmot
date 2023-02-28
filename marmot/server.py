@@ -1,100 +1,24 @@
 """Marmot server
 """
-from enum import Enum
-from uuid import uuid4
 from json import dumps
-from asyncio import Semaphore, Event, sleep
+from asyncio import CancelledError, Event, sleep, create_task
 from pathlib import Path
 from argparse import ArgumentParser
-from dataclasses import dataclass
 from aiohttp import web
-from aioredis import Redis
 from aiohttp_sse import sse_response
 from .__version__ import version
-from .helper.crypto import (
-    MarmotPublicKey,
-    MarmotPrivateKey,
-    hash_marmot_data,
-    sign_marmot_data_digest,
-    verify_marmot_data_digest,
-)
+from .helper.api import MarmotAPIMessage
 from .helper.config import MarmotConfig
 from .helper.logging import LOGGER
-from .helper.authorization import can_listen, can_whistle
+from .helper.backend import MarmotServerBackend
 
 
 BANNER = f"Marmot Server {version}"
 
 
-class MarmotMessageLevel(Enum):
-    """Marmot message level"""
-
-    CRITICAL = 'critical'
-    ERROR = 'error'
-    WARNING = 'warning'
-    INFO = 'info'
-    DEBUG = 'debug'
-
-
-@dataclass
-class MarmotAPIMessage:
-    """Marmot API message"""
-
-    channel: str
-    content: str
-    whistler: str
-    signature: str = None
-    guid: str = str(uuid4())
-    level: MarmotMessageLevel = MarmotMessageLevel.INFO
-
-    @property
-    def digest(self):
-        """Message digest"""
-        message_data = ':'.join([self.channel, self.level.value, self.content])
-        return hash_marmot_data(message_data.encode())
-
-    @classmethod
-    def from_dict(cls, dct):
-        """Create message object from dict"""
-        return cls(
-            channel=dct['channel'],
-            content=dct['content'],
-            whistler=dct['whistler'],
-            guid=dct['guid'],
-            level=MarmotMessageLevel(dct['level']),
-            signature=dct['signature'],
-        )
-
-    def to_dict(self):
-        """Convert message object to JSON serializable dict"""
-        return {
-            'channel': self.channel,
-            'content': self.content,
-            'whistler': self.whistler,
-            'guid': self.guid,
-            'level': self.level.value,
-            'signature': self.signature,
-        }
-
-    def sign(self, prikey: MarmotPrivateKey):
-        """Update message signature"""
-        self.signature = sign_marmot_data_digest(prikey, self.digest)
-        return self
-
-    def verify(self, pubkey: MarmotPublicKey):
-        """Verify message signature"""
-        return verify_marmot_data_digest(pubkey, self.digest, self.signature)
-
-
-async def _messages_from_request(request):
-    body = await request.json()
-    if 'messages' not in body:
-        raise web.HTTPBadRequest
-    for message in body['messages']:
-        yield MarmotAPIMessage.from_dict(message)
-
-
-async def _forward_messages_from(request, pubsub, stop_event):
+async def _forward_messages_from(request, guid, channel):
+    backend = request.app['backend']
+    stop_event = request.app['stop_event']
     async with sse_response(request, sep='\r\n') as resp:
         # set ping interval
         resp.ping_interval = 5
@@ -109,9 +33,9 @@ async def _forward_messages_from(request, pubsub, stop_event):
                 await resp.send('reset', event='reset')
                 break
             # retrieve next message from channel and forward it
-            message = await pubsub.get_message(ignore_subscribe_messages=True)
-            if message is not None:
-                await resp.send(dumps(message['data']), event='whistle')
+            async for message_id, message in backend.pull(channel, guid):
+                await resp.send(dumps(message.to_dict()), event='whistle')
+                await backend.ack(channel, guid, message_id)
             # sleep before processing next message
             await sleep(1)
 
@@ -123,109 +47,129 @@ async def _listen(request):
     except KeyError as exc:
         raise web.HTTPBadRequest from exc
     channel = request.match_info.get('channel')
-    config = request.app['config']
-    if not can_listen(config, guid, channel, signature):
+    backend = request.app['backend']
+    can_listen = await backend.can_listen(guid, channel, signature)
+    if not can_listen:
         LOGGER.warning(
-            "prevented unauthorized listen attempt from %s@%s on #%s",
+            "client unauthorized listen attempt: (%s, %s, %s)",
             guid,
             request.remote,
             channel,
         )
         raise web.HTTPForbidden
-    listen_sem = request.app['listen_sem']
-    stop_event = request.app['stop_event']
-    if listen_sem.locked():
-        raise web.HTTPConflict
-    async with listen_sem:
+    # NOTE: a semaphore might be needed here to limit the number of
+    #       simultaneous listeners
+    LOGGER.info(
+        "client is listening: (%s, %s, %s)",
+        guid,
+        request.remote,
+        channel,
+    )
+    try:
+        await _forward_messages_from(request, guid, channel)
+    except ConnectionResetError:
         LOGGER.info(
-            "client [%s](%s) is listening on #%s",
+            "client connection reset caught: (%s, %s, %s)",
             guid,
             request.remote,
             channel,
         )
-        redis = request.app['redis']
-        pubsub = redis.pubsub()
-        async with pubsub as psc:
-            await psc.subscribe(channel)
-            try:
-                await _forward_messages_from(request, psc, stop_event)
-            except ConnectionResetError:
-                LOGGER.info(
-                    "connection reset caught for [%s](%s) (listening on #%s)",
-                    guid,
-                    request.remote,
-                    channel,
-                )
-            finally:
-                await psc.unsubscribe(channel)
-        await pubsub.close()
 
 
 async def _whistle(request):
-    redis = request.app['redis']
-    config = request.app['config']
+    backend = request.app['backend']
+    body = await request.json()
+    if 'messages' not in body:
+        raise web.HTTPBadRequest
+    messages = [
+        MarmotAPIMessage.from_dict(message) for message in body['messages']
+    ]
     published = []
-    unauthorized = []
-    async for message in _messages_from_request(request):
-        if not can_whistle(config, message):
+    for message in messages:
+        can_whistle = await backend.can_whistle(message)
+        if not can_whistle:
             LOGGER.warning(
-                "prevented unauthorized whistle attempt from %s@%s on #%s",
+                "client unauthorized whistle attempt: (%s, %s, %s)",
                 message.whistler,
                 request.remote,
                 message.channel,
             )
-            unauthorized.append(message.uid)
+            published.append(False)
             continue
         LOGGER.info(
-            "client [%s](%s) is whistling on #%s",
+            "client is whistling: (%s, %s, %s)",
             message.whistler,
             request.remote,
             message.channel,
         )
-        await redis.publish(
-            message.channel,
-            dumps(
-                {
-                    'whistler': message.whistler,
-                    'level': message.level.value,
-                    'content': message.content,
-                }
-            ),
-        )
-        published.append(message.guid)
-    return web.json_response(
-        {'published': published, 'unauthorized': unauthorized}
-    )
+        await backend.push(message)
+        published.append(True)
+    return web.json_response({'published': published})
 
 
-def _parse_args():
-    parser = ArgumentParser(description=BANNER)
-    parser.add_argument(
-        '--config', '-c', type=Path, default=Path('marmot.json'), help="TODO"
-    )
-    parser.add_argument('--host', help="TODO")
-    parser.add_argument('--port', type=int, help="TODO")
-    parser.add_argument('--redis-url', help="TODO")
-    parser.add_argument('--redis-max-connections', help="TODO")
-    return parser.parse_args()
+async def _backend_trim_task(backend):
+    """Trim backend channels every 20 seconds"""
+    while True:
+        await backend.trim_all()
+        await sleep(20)
 
 
 async def _on_startup(webapp):
     LOGGER.info("starting up...")
     webapp['stop_event'].clear()
+    LOGGER.info("loading configuration...")
+    await webapp['backend'].load(webapp['config'])
+    LOGGER.info("starting background tasks...")
+    webapp['background_tasks'] = []
+    for name, task in (
+        ('backend_trim_task', _backend_trim_task(webapp['backend'])),
+    ):
+        LOGGER.info("starting task: %s", name)
+        webapp['background_tasks'].append(create_task(task, name=name))
 
 
 async def _on_shutdown(webapp):
     print()
     LOGGER.info("shutting down...")
     webapp['stop_event'].set()
+    LOGGER.info("terminating background tasks...")
+    for task in webapp['background_tasks']:
+        task.cancel()
+        LOGGER.info("waiting for canceled task: %s", task.get_name())
+        try:
+            await task
+        except CancelledError:
+            LOGGER.info("task successfully canceled.")
     await sleep(1)
 
 
 async def _on_cleanup(webapp):
     LOGGER.info("cleaning up...")
-    await webapp['redis'].close()
+    await webapp['backend'].close()
     await sleep(1)
+
+
+def _parse_args():
+    parser = ArgumentParser(description=BANNER)
+    parser.add_argument(
+        '--config',
+        '-c',
+        type=Path,
+        default=Path('marmot.json'),
+        help="Marmot configuration path",
+    )
+    parser.add_argument('--host', help="Marmot server host")
+    parser.add_argument('--port', type=int, help="Marmot server port")
+    parser.add_argument(
+        '--redis-url',
+        help="Marmot redis url, do not add credentials in this url",
+    )
+    parser.add_argument(
+        '--redis-max-connections',
+        type=int,
+        help="Marmot redis max connections",
+    )
+    return parser.parse_args()
 
 
 def app():
@@ -249,16 +193,12 @@ def app():
         10,
     )
     webapp = web.Application()
-    webapp['redis'] = Redis.from_url(
-        redis_url,
-        max_connections=redis_max_connections,
-        encoding='utf-8',
-        decode_responses=True,
-    )
     webapp['config'] = config
-    webapp['listen_sem'] = Semaphore(redis_max_connections - 1)
+    webapp['backend'] = MarmotServerBackend(
+        args.redis_url or config.server.redis.url,
+        args.redis_max_connections or config.server.redis.max_connections,
+    )
     webapp['stop_event'] = Event()
-
     webapp.add_routes(
         [
             method(pattern, handler)

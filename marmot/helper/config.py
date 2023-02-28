@@ -1,6 +1,7 @@
 """Marmot configuration helper
 """
 import typing as t
+from re import compile as re_compile
 from json import JSONDecodeError, loads, dumps
 from pathlib import Path
 from dataclasses import dataclass, field
@@ -14,6 +15,9 @@ from .crypto import (
     dump_marmot_private_key,
 )
 from .logging import LOGGER
+
+
+CHANNEL_PATTERN = re_compile(r'[a-z_]+(::[a-z_])*')
 
 
 DEFAULT_REDIS_URL = 'redis://localhost'
@@ -94,6 +98,13 @@ class MarmotRedisConfig:
         }
 
 
+def _validate_channel(channel: str) -> str:
+    """Validate channel naming"""
+    if not CHANNEL_PATTERN.fullmatch(channel):
+        raise MarmotConfigError("channel naming error!")
+    return channel
+
+
 @dataclass
 class MarmotServerConfig:
     """Marmot server configuration"""
@@ -118,7 +129,7 @@ class MarmotServerConfig:
                 for client, pubkey in dct.get('clients', {}).items()
             },
             channels={
-                name: MarmotChannelConfig.from_dict(conf)
+                _validate_channel(name): MarmotChannelConfig.from_dict(conf)
                 for name, conf in dct.get('channels', {}).items()
             },
         )
@@ -161,6 +172,7 @@ class MarmotServerConfig:
 
     def add_channel(self, channel):
         """Add channel"""
+        _validate_channel(channel)
         if channel in self.channels:
             LOGGER.warning("channel already exist, channel creation canceled.")
             return
