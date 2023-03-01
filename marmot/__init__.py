@@ -5,7 +5,12 @@ from enum import Enum
 from json import loads
 from asyncio import Event
 from dataclasses import dataclass
-from aiohttp import TCPConnector, ClientTimeout, ClientSession
+from aiohttp import (
+    TCPConnector,
+    ClientTimeout,
+    ClientSession,
+    ClientConnectorError,
+)
 from rich.prompt import Confirm
 from .helper.api import MarmotAPIMessage, MarmotMessageLevel
 from .helper.crypto import (
@@ -68,12 +73,9 @@ class Marmot:
             raise_for_status=False,
         )
 
-    async def listen(
-        self,
-        channel: str,
-        stop_event: Event,
-    ):
-        """Listen in a channel"""
+    async def _listen(
+        self, channel: str, stop_event: Event
+    ) -> t.Iterator[MarmotMessage]:
         url = f'/api/listen/{channel}'
         guid = self._config.client.guid
         headers = {
@@ -102,8 +104,18 @@ class Marmot:
                         whistler=message.whistler,
                     )
 
-    async def whistle(self, messages: t.List[MarmotMessage]):
-        """Whistle messages"""
+    async def listen(
+        self, channel: str, stop_event: Event
+    ) -> t.Iterator[MarmotMessage]:
+        """Listen in a channel"""
+        try:
+            async for message in self._listen(channel, stop_event):
+                yield message
+        except ClientConnectorError:
+            LOGGER.critical("failed to connect to server!")
+            return
+
+    async def _whistle(self, messages: t.List[MarmotMessage]) -> t.List[bool]:
         payload = {
             'messages': [
                 MarmotAPIMessage(
@@ -122,3 +134,11 @@ class Marmot:
         async with self._client.post('/api/whistle', json=payload) as resp:
             body = await resp.json()
             return body['published']
+
+    async def whistle(self, messages: t.List[MarmotMessage]) -> t.List[bool]:
+        """Whistle messages"""
+        try:
+            return await self._whistle(messages)
+        except ClientConnectorError:
+            LOGGER.critical("failed to connect to server!")
+            return []
