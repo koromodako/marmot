@@ -143,10 +143,8 @@ class MarmotServerBackend:
 
     async def trim(self, channel: str):
         """Remove delivered messages from stream"""
-        print(f"trim called: {channel}")
         key = _marmot_channel_listeners(channel)
         listeners = await self._redis.hgetall(key)
-        print(listeners)
         key = _marmot_channel_stream(channel)
         minid = None
         mincount = None
@@ -155,13 +153,9 @@ class MarmotServerBackend:
             if not mincount or count < mincount:
                 minid = last_message_id
                 mincount = count
-        print(minid)
-        print(mincount)
         if minid:
-            print("calling xtrim with minid")
             await self._redis.xtrim(key, minid=minid)
         else:
-            print("calling xtrim with maxlen")
             await self._redis.xtrim(key, maxlen=1)
         return mincount
 

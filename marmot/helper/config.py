@@ -281,7 +281,7 @@ class MarmotConfig:
                 f"cannot decode configuration file: {filepath}"
             ) from exc
         except Exception as exc:
-            raise MarmotConfigError from exc
+            raise MarmotConfigError(f"{exc}") from exc
 
     def to_filepath(self, filepath: Path):
         """Dump marmot configuration to filepath"""

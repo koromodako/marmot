@@ -238,7 +238,11 @@ async def _load(args):
 def _parse_args():
     parser = ArgumentParser(description=BANNER)
     parser.add_argument(
-        '--config', '-c', type=Path, default=Path('marmot.json'), help="TODO"
+        '--config',
+        '-c',
+        type=Path,
+        default=Path('marmot.json'),
+        help="Marmot configuration file",
     )
     cmd = parser.add_subparsers(dest='cmd')
     cmd.required = True

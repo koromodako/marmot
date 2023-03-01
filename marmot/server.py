@@ -81,9 +81,12 @@ async def _whistle(request):
     body = await request.json()
     if 'messages' not in body:
         raise web.HTTPBadRequest
-    messages = [
-        MarmotAPIMessage.from_dict(message) for message in body['messages']
-    ]
+    try:
+        messages = [
+            MarmotAPIMessage.from_dict(message) for message in body['messages']
+        ]
+    except (ValueError, KeyError) as exc:
+        raise web.HTTPBadRequest from exc
     published = []
     for message in messages:
         can_whistle = await backend.can_whistle(message)

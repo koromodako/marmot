@@ -4,7 +4,6 @@ import typing as t
 from ssl import SSLContext, Purpose, create_default_context
 from base64 import b64encode, b64decode
 from pathlib import Path
-from getpass import getpass
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.hashes import Hash, SHA256
 from cryptography.hazmat.primitives.serialization import (
@@ -20,6 +19,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PrivateKey as MarmotPrivateKey,
 )
 from .logging import LOGGER
+from .secret_provider import SECRET_PROVIDER
 
 
 def create_marmot_ssl_context(capath: Path) -> t.Optional[SSLContext]:
@@ -46,30 +46,30 @@ def dump_marmot_public_key(pubkey: MarmotPublicKey) -> str:
 
 def load_marmot_private_key(b64_der_data: str) -> MarmotPrivateKey:
     """Load a passphrase protected private key"""
-    passphrase = getpass("private key passphrase please: ")
-    if not passphrase:
-        passphrase = None
-    prikey = load_der_private_key(b64decode(b64_der_data), passphrase.encode())
+    secret = SECRET_PROVIDER.fetch()
+    if not secret:
+        secret = None
+    prikey = load_der_private_key(b64decode(b64_der_data), secret)
     LOGGER.info("passphrase is correct.")
     return prikey
 
 
 def dump_marmot_private_key(prikey: MarmotPrivateKey) -> str:
     """Dump a passphrase protected private key"""
-    passphrase = getpass("private key passphrase please: ")
-    if not passphrase:
-        passphrase = None
+    secret = SECRET_PROVIDER.fetch()
+    if not secret:
+        secret = None
     der_data = prikey.private_bytes(
         Encoding.DER,
         PrivateFormat.PKCS8,
-        BestAvailableEncryption(passphrase.encode()),
+        BestAvailableEncryption(secret),
     )
     LOGGER.info("passphrase is correct.")
     return b64encode(der_data).decode()
 
 
 def generate_marmot_private_key() -> MarmotPrivateKey:
-    """Generate a passphrase protected private key"""
+    """Generate a private key"""
     return MarmotPrivateKey.generate()
 
 

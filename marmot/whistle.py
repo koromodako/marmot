@@ -1,5 +1,6 @@
 """Marmot client
 """
+from os import getenv
 from pathlib import Path
 from asyncio import new_event_loop
 from argparse import ArgumentParser
@@ -18,15 +19,13 @@ async def _async_whistle(args):
     if not config.client:
         LOGGER.error("cannot find client configuration in: %s", args.config)
         return
-    async with Marmot.create_http_client(
-        MarmotRole.WHISTLER, config
-    ) as http_client:
-        marmot = Marmot(config, http_client)
+    async with Marmot.create_client(MarmotRole.WHISTLER, config) as client:
+        marmot = Marmot(config, client)
         published = await marmot.whistle(
             [
                 MarmotMessage(
                     channel=args.channel,
-                    content=args.message,
+                    content=args.content,
                     level=args.level,
                 )
             ]
@@ -41,21 +40,34 @@ def _whistle(args):
 
 
 def _parse_args():
+    levels = ','.join([lvl.value for lvl in MarmotMessageLevel])
     parser = ArgumentParser(description=BANNER)
     parser.add_argument(
-        '--config', '-c', type=Path, default=Path('marmot.json'), help="TODO"
+        '--config',
+        '-c',
+        type=Path,
+        default=Path('marmot.json'),
+        help="Marmot configuration file",
     )
-    parser.add_argument('--host', help="TODO")
-    parser.add_argument('--port', type=int, help="TODO")
+    parser.add_argument('--host', help="Marmot server host")
+    parser.add_argument('--port', type=int, help="Marmot server port")
     parser.add_argument(
         '--level',
         '-l',
         type=MarmotMessageLevel,
-        default=MarmotMessageLevel.INFO,
-        help="TODO",
+        default=MarmotMessageLevel(getenv('MARMOT_MSG_LEVEL', 'INFO')),
+        help=f"Marmot message level, one of {{{levels}}}",
     )
-    parser.add_argument('channel', help="TODO")
-    parser.add_argument('message', help="TODO")
+    parser.add_argument(
+        '--channel',
+        default=getenv('MARMOT_MSG_CHANNEL', 'CHANNEL_PLACEHOLDER'),
+        help="Marmot channel",
+    )
+    parser.add_argument(
+        '--content',
+        default=getenv('MARMOT_MSG_CONTENT', 'CONTENT_PLACEHOLDER'),
+        help="Marmot message content",
+    )
     parser.set_defaults(func=_whistle)
     return parser.parse_args()
 

@@ -14,11 +14,11 @@ from .crypto import (
 class MarmotMessageLevel(Enum):
     """Marmot message level"""
 
-    CRITICAL = 'critical'
-    ERROR = 'error'
-    WARNING = 'warning'
-    INFO = 'info'
-    DEBUG = 'debug'
+    CRITICAL = 'CRITICAL'
+    ERROR = 'ERROR'
+    WARNING = 'WARNING'
+    INFO = 'INFO'
+    DEBUG = 'DEBUG'
 
 
 @dataclass

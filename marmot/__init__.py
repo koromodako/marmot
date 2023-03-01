@@ -3,6 +3,7 @@
 import typing as t
 from enum import Enum
 from json import loads
+from asyncio import Event
 from dataclasses import dataclass
 from aiohttp import TCPConnector, ClientTimeout, ClientSession
 from rich.prompt import Confirm
@@ -31,17 +32,18 @@ class MarmotMessage:
     channel: str
     content: str
     level: MarmotMessageLevel = MarmotMessageLevel.INFO
+    whistler: str = ''
 
 
 class Marmot:
     """Marmot"""
 
-    def __init__(self, config: MarmotConfig, http_client: ClientSession):
+    def __init__(self, config: MarmotConfig, client: ClientSession):
         self._config = config
-        self._http_client = http_client
+        self._client = client
 
     @staticmethod
-    def create_http_client(role: MarmotRole, config: MarmotConfig):
+    def create_client(role: MarmotRole, config: MarmotConfig):
         """Create HTTP client session"""
         is_secure = config.client.url.scheme == 'https'
         if not is_secure:
@@ -66,7 +68,11 @@ class Marmot:
             raise_for_status=False,
         )
 
-    async def listen(self, channel, message_processing_cb, stop_event):
+    async def listen(
+        self,
+        channel: str,
+        stop_event: Event,
+    ):
         """Listen in a channel"""
         url = f'/api/listen/{channel}'
         guid = self._config.client.guid
@@ -77,7 +83,7 @@ class Marmot:
                 hash_marmot_data(':'.join([guid, channel]).encode()),
             ),
         }
-        async with self._http_client.get(url, headers=headers) as resp:
+        async with self._client.get(url, headers=headers) as resp:
             if resp.status != 200:
                 LOGGER.error("server sent status code: %s", resp.status)
                 return
@@ -87,7 +93,14 @@ class Marmot:
                     LOGGER.warning("server sent a reset notification.")
                     break
                 if event == 'whistle':
-                    message_processing_cb(loads(evt.data.decode()))
+                    dct = loads(evt.data.decode())
+                    message = MarmotAPIMessage.from_dict(dct)
+                    yield MarmotMessage(
+                        channel=message.channel,
+                        content=message.content,
+                        level=message.level,
+                        whistler=message.whistler,
+                    )
 
     async def whistle(self, messages: t.List[MarmotMessage]):
         """Whistle messages"""
@@ -106,8 +119,6 @@ class Marmot:
                 for message in messages
             ]
         }
-        async with self._http_client.post(
-            '/api/whistle', json=payload
-        ) as resp:
+        async with self._client.post('/api/whistle', json=payload) as resp:
             body = await resp.json()
             return body['published']
