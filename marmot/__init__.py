@@ -9,6 +9,7 @@ from aiohttp import (
     TCPConnector,
     ClientTimeout,
     ClientSession,
+    ServerTimeoutError,
     ClientConnectorError,
 )
 from rich.prompt import Confirm
@@ -50,6 +51,7 @@ class Marmot:
     @staticmethod
     def create_client(role: MarmotRole, config: MarmotConfig):
         """Create HTTP client session"""
+        LOGGER.info("connecting to %s", config.client.url)
         is_secure = config.client.url.scheme == 'https'
         if not is_secure:
             LOGGER.critical("/!\\ USING INSECURE PROTOCOL /!\\")
@@ -61,9 +63,9 @@ class Marmot:
             else None
         )
         timeout = (
-            ClientTimeout()
+            ClientTimeout(sock_connect=5)
             if role == MarmotRole.LISTENER
-            else ClientTimeout(total=60)
+            else ClientTimeout(total=60, sock_connect=5)
         )
         connector = TCPConnector(ssl=sslctx)
         return ClientSession(
@@ -111,9 +113,10 @@ class Marmot:
         try:
             async for message in self._listen(channel, stop_event):
                 yield message
+        except ServerTimeoutError:
+            LOGGER.critical("server seems unreachable!")
         except ClientConnectorError:
-            LOGGER.critical("failed to connect to server!")
-            return
+            LOGGER.critical("server refused connection!")
 
     async def _whistle(self, messages: t.List[MarmotMessage]) -> t.List[bool]:
         payload = {
@@ -139,6 +142,8 @@ class Marmot:
         """Whistle messages"""
         try:
             return await self._whistle(messages)
+        except ServerTimeoutError:
+            LOGGER.critical("server seems unreachable!")
         except ClientConnectorError:
-            LOGGER.critical("failed to connect to server!")
-            return []
+            LOGGER.critical("server refused connection!")
+        return []
