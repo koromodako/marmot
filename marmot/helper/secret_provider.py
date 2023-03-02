@@ -4,6 +4,7 @@ import typing as t
 from os import getenv
 from enum import Enum
 from getpass import getpass
+from secrets import token_urlsafe
 
 
 def _env_secret_provider(backend_argv: t.List[str]) -> t.Optional[bytes]:
@@ -26,11 +27,18 @@ def _getpass_secret_provider(backend_argv: t.List[str]) -> t.Optional[bytes]:
     return secret.encode()
 
 
+def _genpass_secret_provider(_backend_argv: t.List[str]) -> t.Optional[bytes]:
+    secret = token_urlsafe(16)
+    print(f"genpass generated secret: {secret}")
+    return secret.encode()
+
+
 class SecretProviderBackend(Enum):
     """Secret provider backend"""
 
     ENV = 'env'
     GETPASS = 'getpass'
+    GENPASS = 'genpass'
 
 
 _BACKEND = {

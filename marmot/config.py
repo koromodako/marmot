@@ -27,6 +27,7 @@ from .helper.config import (
 from .helper.crypto import generate_marmot_private_key, dump_marmot_public_key
 from .helper.backend import MarmotServerBackend
 from .helper.logging import LOGGER
+from .helper.secret_provider import SECRET_PROVIDER, SecretProviderBackend
 
 
 BANNER = f"Marmot Config {version}"
@@ -44,17 +45,28 @@ async def _init_client(args):
         return
     config.client = MarmotClientConfig(
         guid=str(uuid4()),
-        url=Prompt.ask(
-            "please enter marmot server url", default=str(DEFAULT_MARMOT_URL)
+        url=(
+            str(DEFAULT_MARMOT_URL)
+            if args.use_defaults
+            else Prompt.ask(
+                "please enter marmot server url",
+                default=str(DEFAULT_MARMOT_URL),
+            )
         ),
-        capath=Path(
-            Prompt.ask(
-                "please enter marmot server CA path",
-                default=str(DEFAULT_MARMOT_CAPATH),
+        capath=(
+            str(DEFAULT_MARMOT_CAPATH)
+            if args.use_defaults
+            else Path(
+                Prompt.ask(
+                    "please enter marmot server CA path",
+                    default=str(DEFAULT_MARMOT_CAPATH),
+                )
             )
         ),
         prikey=generate_marmot_private_key(),
     )
+    if args.use_defaults:
+        SECRET_PROVIDER.init(SecretProviderBackend.GENPASS, [])
     config.to_filepath(args.config)
 
 
@@ -68,20 +80,32 @@ async def _init_server(args):
         )
         return
     config.server = MarmotServerConfig(
-        host=Prompt.ask(
-            "please enter marmot host", default=DEFAULT_MARMOT_HOST
+        host=(
+            DEFAULT_MARMOT_HOST
+            if args.use_defaults
+            else Prompt.ask(
+                "please enter marmot host", default=DEFAULT_MARMOT_HOST
+            )
         ),
         port=int(
-            Prompt.ask(
+            str(DEFAULT_MARMOT_PORT)
+            if args.use_defaults
+            else Prompt.ask(
                 "please enter marmot port", default=str(DEFAULT_MARMOT_PORT)
             )
         ),
         redis=MarmotRedisConfig(
-            url=Prompt.ask(
-                "please enter redis url", default=DEFAULT_REDIS_URL
+            url=(
+                DEFAULT_REDIS_URL
+                if args.use_defaults
+                else Prompt.ask(
+                    "please enter redis url", default=DEFAULT_REDIS_URL
+                )
             ),
             max_connections=int(
-                Prompt.ask(
+                str(DEFAULT_REDIS_MAXCONN)
+                if args.use_defaults
+                else Prompt.ask(
                     "please enter redis max connections",
                     default=str(DEFAULT_REDIS_MAXCONN),
                 )
@@ -249,9 +273,19 @@ def _parse_args():
     init_client = cmd.add_parser(
         'init-client', help="Initialize client configuration"
     )
+    init_client.add_argument(
+        '--use-defaults',
+        action='store_true',
+        help="Use default values, non-interactive mode",
+    )
     init_client.set_defaults(async_func=_init_client)
     init_server = cmd.add_parser(
         'init-server', help="Initialize server configuration"
+    )
+    init_server.add_argument(
+        '--use-defaults',
+        action='store_true',
+        help="Use default values, non-interactive mode",
     )
     init_server.set_defaults(async_func=_init_server)
     show_client = cmd.add_parser(
