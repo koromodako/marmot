@@ -1,0 +1,51 @@
+# TESTING ONLY, UNSAFE FOR PRODUCTION!
+services:
+  marmot-redis:
+    container_name: marmot-redis
+    image: redis:7.0.9-alpine
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    volumes:
+      - /data/services/marmot/redis/etc:/usr/local/etc/redis:ro
+      - /data/services/marmot/redis/data:/data
+    networks:
+      - backend
+    logging:
+      driver: journald
+
+  marmot-server:
+    container_name: marmot-server
+    image: marmot
+    depends_on:
+      - marmot-redis
+    volumes:
+      - /data/services/marmot/server/data:/data:rw
+    networks:
+      - backend
+      - frontend
+    logging:
+      driver: journald
+
+  marmot-proxy:
+    container_name: marmot-proxy
+    image: nginx:1.23.3-alpine
+    depends_on:
+      - marmot-server
+    volumes:
+      - /data/services/marmot/nginx/etc/marmot.conf:/etc/nginx/conf.d/marmot.conf:ro
+      - /data/services/marmot/nginx/etc/dhparam.pem:/etc/marmot/dhparam.pem:ro
+      - /data/services/marmot/nginx/etc/api.marmot.org.crt.pem:/etc/marmot/api.marmot.org.crt.pem:ro
+      - /data/services/marmot/nginx/etc/api.marmot.org.key.pem:/etc/marmot/api.marmot.org.key.pem:ro
+    networks:
+      - frontend
+      - default
+    ports:
+      - 127.0.0.1:80:80
+      - 127.0.0.1:443:443
+    logging:
+      driver: journald
+
+networks:
+  frontend:
+    internal: true
+  backend:
+    internal: true
