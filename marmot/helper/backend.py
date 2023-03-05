@@ -126,17 +126,22 @@ class MarmotServerBackend:
 
     async def pull(
         self, channels: t.List[str], listener: str
-    ) -> t.Iterator[t.Tuple[str, MarmotAPIMessage]]:
+    ) -> t.Iterator[
+        t.Union[t.Tuple[str, MarmotAPIMessage], t.Tuple[None, None]]
+    ]:
         """Pull pending messages"""
         states = {}
         for channel in channels:
             key = _marmot_channel_listeners(channel)
             last_message_id = await self._redis.hget(key, listener)
+            if not last_message_id:
+                continue
             key = _marmot_channel_stream(channel)
             states[key] = last_message_id
-        print(states)
+        if not states:
+            yield None, None
+            return
         streams = await self._redis.xread(states)
-        print(streams)
         for _, messages in streams:
             for message_id, message in messages:
                 yield message_id, MarmotAPIMessage.from_dict(message)

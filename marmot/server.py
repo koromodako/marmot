@@ -22,6 +22,7 @@ async def _forward_messages_from(request, guid: str, channels: t.List[str]):
     stop_event = request.app['stop_event']
     async with sse_response(request, sep='\r\n') as resp:
         # set ping interval
+        unauthorized = False
         resp.ping_interval = 5
         while True:
             # internal ping task ends prematurely meaning that the client
@@ -29,12 +30,16 @@ async def _forward_messages_from(request, guid: str, channels: t.List[str]):
             # not nice, pending https://github.com/aio-libs/aiohttp-sse/issues/391
             if resp._ping_task.done():
                 break
-            # server is shutting down, notify the client and exit
-            if stop_event.is_set():
+            # authorization revoked or server is shutting down,
+            # notify the client and exit
+            if unauthorized or stop_event.is_set():
                 await resp.send('reset', event='reset')
                 break
             # retrieve next message from channel and forward it
             async for message_id, message in backend.pull(channels, guid):
+                if message_id is None and message is None:
+                    unauthorized = True
+                    continue
                 await resp.send(dumps(message.to_dict()), event='whistle')
                 await backend.ack(message.channel, guid, message_id)
             # sleep before processing next message
@@ -58,23 +63,29 @@ async def _listen(request):
             "client unauthorized listen attempt: (%s, %s, %s)",
             guid,
             request.remote,
-            '|'.join(channels),
+            channels,
         )
         raise web.HTTPForbidden
     LOGGER.info(
         "client is listening: (%s, %s, %s)",
         guid,
         request.remote,
-        '|'.join(channels),
+        channels,
     )
     try:
         await _forward_messages_from(request, guid, channels)
+        LOGGER.info(
+            "client connection closed: (%s, %s, %s)",
+            guid,
+            request.remote,
+            channels,
+        )
     except ConnectionResetError:
         LOGGER.info(
             "client connection reset caught: (%s, %s, %s)",
             guid,
             request.remote,
-            '|'.join(channels),
+            channels,
         )
 
 
