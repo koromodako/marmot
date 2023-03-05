@@ -1,7 +1,7 @@
 """Marmot config application
 """
 from uuid import uuid4
-from asyncio import new_event_loop, sleep
+from asyncio import new_event_loop
 from pathlib import Path
 from argparse import ArgumentParser
 from rich.box import ROUNDED
@@ -13,6 +13,7 @@ from rich.prompt import Prompt, Confirm
 from rich.console import Console
 from .__version__ import version
 from .helper.config import (
+    validate_guid,
     MarmotConfig,
     MarmotConfigError,
     MarmotRedisConfig,
@@ -62,8 +63,13 @@ async def _init_client(args):
             "client already initialized, client initialization canceled."
         )
         return
+    guid = str(uuid4())
     fs_config.client = MarmotClientConfig(
-        guid=str(uuid4()),
+        guid=validate_guid(
+            guid
+            if args.use_defaults
+            else Prompt.ask("please enter marmot client guid", default=guid)
+        ),
         url=(
             str(DEFAULT_MARMOT_URL)
             if args.use_defaults
