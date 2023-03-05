@@ -161,18 +161,18 @@ def _parse_args():
         '-c',
         type=Path,
         default=Path('marmot.json'),
-        help="Marmot configuration path",
+        help="marmot configuration file",
     )
-    parser.add_argument('--host', help="Marmot server host")
-    parser.add_argument('--port', type=int, help="Marmot server port")
+    parser.add_argument('--host', help="marmot server host")
+    parser.add_argument('--port', type=int, help="marmot server port")
     parser.add_argument(
         '--redis-url',
-        help="Marmot redis url, do not add credentials in this url",
+        help="marmot redis url, do not add credentials in this url",
     )
     parser.add_argument(
         '--redis-max-connections',
         type=int,
-        help="Marmot redis max connections",
+        help="marmot redis max connections",
     )
     return parser.parse_args()
 

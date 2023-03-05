@@ -1,5 +1,6 @@
 """Marmot config application
 """
+from re import compile as re_compile
 from uuid import uuid4
 from asyncio import new_event_loop
 from pathlib import Path
@@ -36,6 +37,18 @@ BANNER = f"Marmot Config {version}"
 CONSOLE = Console()
 ADDED_STYLE = 'green'
 DELETED_STYLE = 'red'
+
+UNIX_URL_PATTERN = re_compile(r'password=([^&\n]+)')
+REDIS_URL_PATTERN = re_compile(r'(rediss?)://([^:/]+):([^@/]+)@(.*)')
+
+
+def _redact_redis_url(url: str) -> str:
+    for pattern, repl in (
+        (UNIX_URL_PATTERN, 'password=[REDACTED]'),
+        (REDIS_URL_PATTERN, '\1://\2:[REDACTED]@\4'),
+    ):
+        url = pattern.sub(repl, url)
+    return url
 
 
 def _load_client_config(config: Path):
@@ -169,7 +182,7 @@ async def _show_server(args):
     )
     table.add_row("host", fs_config.server.host)
     table.add_row("port", str(fs_config.server.port))
-    table.add_row("redis.url", fs_config.server.redis.url)
+    table.add_row("redis.url", _redact_redis_url(fs_config.server.redis.url))
     table.add_row(
         "redis.max_connections", str(fs_config.server.redis.max_connections)
     )
@@ -374,107 +387,107 @@ def _parse_args():
         '-c',
         type=Path,
         default=Path('marmot.json'),
-        help="Marmot configuration file",
+        help="marmot configuration file",
     )
     cmd = parser.add_subparsers(dest='cmd')
     cmd.required = True
     init_client = cmd.add_parser(
-        'init-client', help="Initialize client configuration"
+        'init-client', help="initialize client configuration"
     )
     init_client.add_argument(
         '--use-defaults',
         action='store_true',
-        help="Use default values, non-interactive mode",
+        help="use default values, non-interactive mode",
     )
     init_client.set_defaults(async_func=_init_client)
     init_server = cmd.add_parser(
-        'init-server', help="Initialize server configuration"
+        'init-server', help="initialize server configuration"
     )
     init_server.add_argument(
         '--use-defaults',
         action='store_true',
-        help="Use default values, non-interactive mode",
+        help="use default values, non-interactive mode",
     )
     init_server.set_defaults(async_func=_init_server)
     show_client = cmd.add_parser(
-        'show-client', help="Show client configuration"
+        'show-client', help="show client configuration"
     )
     show_client.set_defaults(async_func=_show_client)
     show_server = cmd.add_parser(
-        'show-server', help="Show server configuration"
+        'show-server', help="show server configuration"
     )
     show_server.set_defaults(async_func=_show_server)
-    add_client = cmd.add_parser('add-client', help="Add a client")
-    add_client.add_argument('guid', help="GUID of the client to add")
-    add_client.add_argument('pubkey', help="Public key of the client to add")
+    add_client = cmd.add_parser('add-client', help="add a client")
+    add_client.add_argument('guid', help="guid of the client to add")
+    add_client.add_argument('pubkey', help="public key of the client to add")
     add_client.set_defaults(async_func=_add_client)
-    del_client = cmd.add_parser('del-client', help="Delete a client")
-    del_client.add_argument('guid', help="GUID of the client to delete")
+    del_client = cmd.add_parser('del-client', help="delete a client")
+    del_client.add_argument('guid', help="guid of the client to delete")
     del_client.set_defaults(async_func=_del_client)
-    add_channel = cmd.add_parser('add-channel', help="Add a channel")
-    add_channel.add_argument('channel', help="Channel to add")
+    add_channel = cmd.add_parser('add-channel', help="add a channel")
+    add_channel.add_argument('channel', help="channel to add")
     add_channel.set_defaults(async_func=_add_channel)
-    del_channel = cmd.add_parser('del-channel', help="Delete a channel")
-    del_channel.add_argument('channel', help="Channel to delete")
+    del_channel = cmd.add_parser('del-channel', help="delete a channel")
+    del_channel.add_argument('channel', help="channel to delete")
     del_channel.set_defaults(async_func=_del_channel)
     add_whistler = cmd.add_parser(
-        'add-whistler', help="Add a whistler to a channel"
+        'add-whistler', help="add a whistler to a channel"
     )
-    add_whistler.add_argument('channel', help="Channel to update")
-    add_whistler.add_argument('guid', help="GUID of the whistler to add")
+    add_whistler.add_argument('channel', help="channel to update")
+    add_whistler.add_argument('guid', help="guid of the whistler to add")
     add_whistler.set_defaults(async_func=_add_whistler)
     del_whistler = cmd.add_parser(
-        'del-whistler', help="Delete a whistler from a channel"
+        'del-whistler', help="delete a whistler from a channel"
     )
-    del_whistler.add_argument('channel', help="Channel to update")
-    del_whistler.add_argument('guid', help="GUID of the whistler to delete")
+    del_whistler.add_argument('channel', help="channel to update")
+    del_whistler.add_argument('guid', help="guid of the whistler to delete")
     del_whistler.set_defaults(async_func=_del_whistler)
     add_listener = cmd.add_parser(
-        'add-listener', help="Add a listener to a channel"
+        'add-listener', help="add a listener to a channel"
     )
-    add_listener.add_argument('channel', help="Channel to update")
-    add_listener.add_argument('guid', help="GUID of the listener to add")
+    add_listener.add_argument('channel', help="channel to update")
+    add_listener.add_argument('guid', help="guid of the listener to add")
     add_listener.set_defaults(async_func=_add_listener)
     del_listener = cmd.add_parser(
-        'del-listener', help="Delete a listener from a channel"
+        'del-listener', help="delete a listener from a channel"
     )
-    del_listener.add_argument('channel', help="Channel to update")
-    del_listener.add_argument('guid', help="GUID of the listener to delete")
+    del_listener.add_argument('channel', help="channel to update")
+    del_listener.add_argument('guid', help="guid of the listener to delete")
     del_listener.set_defaults(async_func=_del_listener)
     diff = cmd.add_parser(
         'diff',
-        help="Show what will happen when fs config is pushed to backend",
+        help="show what will happen when fs config is pushed to backend",
     )
     diff.add_argument(
         '--redis-url',
-        help="Marmot redis url, do not add credentials in this url",
+        help="marmot redis url, do not add credentials in this url",
     )
     diff.add_argument(
         '--redis-max-connections',
         type=int,
-        help="Marmot redis max connections",
+        help="marmot redis max connections",
     )
     diff.set_defaults(async_func=_diff)
-    push = cmd.add_parser('push', help="Push fs config to backend")
+    push = cmd.add_parser('push', help="push fs config to backend")
     push.add_argument(
         '--redis-url',
-        help="Marmot redis url, do not add credentials in this url",
+        help="marmot redis url, do not add credentials in this url",
     )
     push.add_argument(
         '--redis-max-connections',
         type=int,
-        help="Marmot redis max connections",
+        help="marmot redis max connections",
     )
     push.set_defaults(async_func=_push)
-    pull = cmd.add_parser('pull', help="Pull backend config to fs")
+    pull = cmd.add_parser('pull', help="pull backend config to fs")
     pull.add_argument(
         '--redis-url',
-        help="Marmot redis url, do not add credentials in this url",
+        help="marmot redis url, do not add credentials in this url",
     )
     pull.add_argument(
         '--redis-max-connections',
         type=int,
-        help="Marmot redis max connections",
+        help="marmot redis max connections",
     )
     pull.set_defaults(async_func=_pull)
     return parser.parse_args()

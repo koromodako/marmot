@@ -80,18 +80,18 @@ def _parse_args():
         '-c',
         type=Path,
         default=Path('marmot.json'),
-        help="Marmot client configuration file",
+        help="marmot client configuration file",
     )
-    parser.add_argument('--host', help="Marmot server host")
-    parser.add_argument('--port', type=int, help="Marmot server port")
+    parser.add_argument('--host', help="marmot server host")
+    parser.add_argument('--port', type=int, help="marmot server port")
     parser.add_argument(
-        '--script', type=Path, help="Invoke script with message"
+        '--script', type=Path, help="invoke script with message"
     )
     parser.add_argument(
         'channels',
         metavar='channel',
         nargs='+',
-        help="Marmot channel to listen to",
+        help="marmot channel to listen to",
     )
     parser.set_defaults(func=_listen)
     return parser.parse_args()

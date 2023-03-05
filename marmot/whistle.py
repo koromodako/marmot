@@ -47,26 +47,26 @@ def _parse_args():
         '-c',
         type=Path,
         default=Path('marmot.json'),
-        help="Marmot configuration file",
+        help="marmot configuration file",
     )
-    parser.add_argument('--host', help="Marmot server host")
-    parser.add_argument('--port', type=int, help="Marmot server port")
+    parser.add_argument('--host', help="marmot server host")
+    parser.add_argument('--port', type=int, help="marmot server port")
     parser.add_argument(
         '--level',
         '-l',
         type=MarmotMessageLevel,
         default=MarmotMessageLevel(getenv('MARMOT_MSG_LEVEL', 'INFO')),
-        help=f"Marmot message level, one of {{{levels}}}",
+        help=f"marmot message level, one of {{{levels}}}",
     )
     parser.add_argument(
         '--channel',
         default=getenv('MARMOT_MSG_CHANNEL', 'CHANNEL_PLACEHOLDER'),
-        help="Marmot channel",
+        help="marmot channel",
     )
     parser.add_argument(
         '--content',
         default=getenv('MARMOT_MSG_CONTENT', 'CONTENT_PLACEHOLDER'),
-        help="Marmot message content",
+        help="marmot message content",
     )
     parser.set_defaults(func=_whistle)
     return parser.parse_args()
