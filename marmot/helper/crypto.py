@@ -80,6 +80,15 @@ def hash_marmot_data(data: bytes) -> bytes:
     return digest.finalize()
 
 
+def hash_marmot_listen_params(
+    guid: str, channels: t.Union[t.Set[str], t.List[str]]
+) -> bytes:
+    """Compute marmot listen params digest"""
+    params = [guid]
+    params.extend(sorted(set(channels)))
+    return hash_marmot_data(':'.join(params).encode())
+
+
 def sign_marmot_data_digest(prikey: MarmotPrivateKey, digest: bytes) -> str:
     """Sign marmot data using private key"""
     return b64encode(prikey.sign(digest)).decode()

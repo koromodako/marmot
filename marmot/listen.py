@@ -52,7 +52,7 @@ async def _async_listen(args):
         return
     async with Marmot.create_client(MarmotRole.LISTENER, config) as client:
         marmot = Marmot(config, client)
-        async for message in marmot.listen(args.channel, STOP_EVENT):
+        async for message in marmot.listen(set(args.channels), STOP_EVENT):
             _display(message)
             if args.script:
                 await _exec(args.script, message)
@@ -87,7 +87,12 @@ def _parse_args():
     parser.add_argument(
         '--script', type=Path, help="Invoke script with message"
     )
-    parser.add_argument('channel', help="Marmot channel to listen to")
+    parser.add_argument(
+        'channels',
+        metavar='channel',
+        nargs='+',
+        help="Marmot channel to listen to",
+    )
     parser.set_defaults(func=_listen)
     return parser.parse_args()
 

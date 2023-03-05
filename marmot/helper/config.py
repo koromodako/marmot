@@ -17,6 +17,7 @@ from .crypto import (
 from .logging import LOGGER
 
 
+GUID_PATTERN = re_compile(r'[a-z_\d\-]+')
 CHANNEL_PATTERN = re_compile(r'[a-z_]+(::[a-z_])*')
 
 
@@ -98,8 +99,15 @@ class MarmotRedisConfig:
         }
 
 
+def _validate_guid(guid: str) -> str:
+    """Validate client guid against naming convention"""
+    if not GUID_PATTERN.fullmatch(guid):
+        raise MarmotConfigError("guid naming error!")
+    return guid
+
+
 def _validate_channel(channel: str) -> str:
-    """Validate channel naming"""
+    """Validate channel name against naming convention"""
     if not CHANNEL_PATTERN.fullmatch(channel):
         raise MarmotConfigError("channel naming error!")
     return channel
@@ -125,8 +133,8 @@ class MarmotServerConfig:
             port=int(dct.get('port', DEFAULT_MARMOT_PORT)),
             redis=MarmotRedisConfig.from_dict(dct.get('redis', {})),
             clients={
-                client: load_marmot_public_key(pubkey)
-                for client, pubkey in dct.get('clients', {}).items()
+                _validate_guid(guid): load_marmot_public_key(pubkey)
+                for guid, pubkey in dct.get('clients', {}).items()
             },
             channels={
                 _validate_channel(name): MarmotChannelConfig.from_dict(conf)
@@ -152,6 +160,7 @@ class MarmotServerConfig:
 
     def add_client(self, guid, pubkey):
         """Add client"""
+        _validate_guid(guid)
         if guid in self.clients:
             LOGGER.warning("client already exist, client creation canceled.")
             return
@@ -187,6 +196,11 @@ class MarmotServerConfig:
 
     def add_whistler(self, channel, guid):
         """Add whistler"""
+        if guid not in self.clients:
+            LOGGER.warning(
+                "cannot add unknown client to whistlers, registration canceled."
+            )
+            return
         channel = self.channels.get(channel)
         if not channel:
             return
@@ -201,6 +215,11 @@ class MarmotServerConfig:
 
     def add_listener(self, channel, guid):
         """Add listener"""
+        if guid not in self.clients:
+            LOGGER.warning(
+                "cannot add unknown client to whistlers, registration canceled."
+            )
+            return
         channel = self.channels.get(channel)
         if not channel:
             return
@@ -229,7 +248,7 @@ class MarmotClientConfig:
         if dct is None:
             return None
         return cls(
-            guid=dct['guid'],
+            guid=_validate_guid(dct['guid']),
             url=URL(dct.get('url', str(DEFAULT_MARMOT_URL))),
             capath=Path(dct.get('capath', str(DEFAULT_MARMOT_CAPATH))),
             prikey=load_marmot_private_key(dct['prikey']),

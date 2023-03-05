@@ -15,9 +15,9 @@ from aiohttp import (
 from rich.prompt import Confirm
 from .helper.api import MarmotAPIMessage, MarmotMessageLevel
 from .helper.crypto import (
-    hash_marmot_data,
     sign_marmot_data_digest,
     create_marmot_ssl_context,
+    hash_marmot_listen_params,
 )
 from .helper.config import MarmotConfig
 from .helper.logging import LOGGER
@@ -76,18 +76,18 @@ class Marmot:
         )
 
     async def _listen(
-        self, channel: str, stop_event: Event
+        self, channels: t.List[str], stop_event: Event
     ) -> t.Iterator[MarmotMessage]:
-        url = f'/api/listen/{channel}'
         guid = self._config.client.guid
         headers = {
             'X-Marmot-GUID': guid,
+            'X-Marmot-Channels': '|'.join(channels),
             'X-Marmot-Signature': sign_marmot_data_digest(
                 self._config.client.prikey,
-                hash_marmot_data(':'.join([guid, channel]).encode()),
+                hash_marmot_listen_params(guid, channels),
             ),
         }
-        async with self._client.get(url, headers=headers) as resp:
+        async with self._client.get('/api/listen', headers=headers) as resp:
             if resp.status != 200:
                 LOGGER.error("server sent status code: %s", resp.status)
                 return
@@ -107,11 +107,12 @@ class Marmot:
                     )
 
     async def listen(
-        self, channel: str, stop_event: Event
+        self, channels: t.Set[str], stop_event: Event
     ) -> t.Iterator[MarmotMessage]:
-        """Listen in a channel"""
+        """Listen to one or more channels"""
+        channels = list(sorted(list(channels)))
         try:
-            async for message in self._listen(channel, stop_event):
+            async for message in self._listen(channels, stop_event):
                 yield message
         except ServerTimeoutError:
             LOGGER.critical("server seems unreachable!")

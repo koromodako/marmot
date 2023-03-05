@@ -11,9 +11,9 @@ from .config import (
 )
 from .crypto import (
     MarmotPublicKey,
-    hash_marmot_data,
     load_marmot_public_key,
     dump_marmot_public_key,
+    hash_marmot_listen_params,
     verify_marmot_data_digest,
 )
 from .logging import LOGGER
@@ -125,13 +125,18 @@ class MarmotServerBackend:
         await self._redis.xadd(key, message.to_dict())
 
     async def pull(
-        self, channel: str, listener: str
+        self, channels: t.List[str], listener: str
     ) -> t.Iterator[t.Tuple[str, MarmotAPIMessage]]:
         """Pull pending messages"""
-        key = _marmot_channel_listeners(channel)
-        last_message_id = await self._redis.hget(key, listener)
-        key = _marmot_channel_stream(channel)
-        streams = await self._redis.xread({key: last_message_id})
+        states = {}
+        for channel in channels:
+            key = _marmot_channel_listeners(channel)
+            last_message_id = await self._redis.hget(key, listener)
+            key = _marmot_channel_stream(channel)
+            states[key] = last_message_id
+        print(states)
+        streams = await self._redis.xread(states)
+        print(streams)
         for _, messages in streams:
             for message_id, message in messages:
                 yield message_id, MarmotAPIMessage.from_dict(message)
@@ -210,22 +215,25 @@ class MarmotServerBackend:
             )
         )
 
-    async def can_listen(self, guid: str, channel: str, signature: str):
+    async def can_listen(
+        self, guid: str, channels: t.Set[str], signature: str
+    ):
         """Determine if marmot can listen"""
         pubkey = await self._redis.hget(KEY_MARMOT_CLIENTS, guid)
         if not pubkey:
             LOGGER.error("unknown client: %s", guid)
             return False
-        count = await self._redis.sismember(KEY_MARMOT_CHANNELS, channel)
-        if count == 0:
-            LOGGER.error("unknown channel: %s", channel)
-            return False
-        key = _marmot_channel_listeners(channel)
-        count = await self._redis.hexists(key, guid)
-        if count == 0:
-            LOGGER.error("unknown channel listener: %s", guid)
-            return False
-        digest = hash_marmot_data(':'.join([guid, channel]).encode())
+        for channel in channels:
+            count = await self._redis.sismember(KEY_MARMOT_CHANNELS, channel)
+            if count == 0:
+                LOGGER.error("unknown channel: %s", channel)
+                return False
+            key = _marmot_channel_listeners(channel)
+            count = await self._redis.hexists(key, guid)
+            if count == 0:
+                LOGGER.error("unknown channel listener: %s", guid)
+                return False
+        digest = hash_marmot_listen_params(guid, channels)
         pubkey = load_marmot_public_key(pubkey)
         if not verify_marmot_data_digest(pubkey, digest, signature):
             LOGGER.error("signature verification failed.")

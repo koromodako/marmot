@@ -1,5 +1,6 @@
 """Marmot server
 """
+import typing as t
 from json import dumps
 from asyncio import CancelledError, Event, sleep, create_task
 from pathlib import Path
@@ -16,7 +17,7 @@ from .helper.backend import MarmotServerBackend
 BANNER = f"Marmot Server {version}"
 
 
-async def _forward_messages_from(request, guid, channel):
+async def _forward_messages_from(request, guid: str, channels: t.List[str]):
     backend = request.app['backend']
     stop_event = request.app['stop_event']
     async with sse_response(request, sep='\r\n') as resp:
@@ -33,46 +34,47 @@ async def _forward_messages_from(request, guid, channel):
                 await resp.send('reset', event='reset')
                 break
             # retrieve next message from channel and forward it
-            async for message_id, message in backend.pull(channel, guid):
+            async for message_id, message in backend.pull(channels, guid):
                 await resp.send(dumps(message.to_dict()), event='whistle')
-                await backend.ack(channel, guid, message_id)
+                await backend.ack(message.channel, guid, message_id)
             # sleep before processing next message
             await sleep(1)
 
 
 async def _listen(request):
+    # NOTE: a semaphore might be needed here to limit the number of
+    #       simultaneous listeners
     try:
         guid = request.headers['X-Marmot-GUID']
+        channels = set(request.headers['X-Marmot-Channels'].split('|'))
         signature = request.headers['X-Marmot-Signature']
     except KeyError as exc:
         raise web.HTTPBadRequest from exc
-    channel = request.match_info.get('channel')
     backend = request.app['backend']
-    can_listen = await backend.can_listen(guid, channel, signature)
+    can_listen = await backend.can_listen(guid, channels, signature)
+    channels = list(sorted(channels))
     if not can_listen:
         LOGGER.warning(
             "client unauthorized listen attempt: (%s, %s, %s)",
             guid,
             request.remote,
-            channel,
+            '|'.join(channels),
         )
         raise web.HTTPForbidden
-    # NOTE: a semaphore might be needed here to limit the number of
-    #       simultaneous listeners
     LOGGER.info(
         "client is listening: (%s, %s, %s)",
         guid,
         request.remote,
-        channel,
+        '|'.join(channels),
     )
     try:
-        await _forward_messages_from(request, guid, channel)
+        await _forward_messages_from(request, guid, channels)
     except ConnectionResetError:
         LOGGER.info(
             "client connection reset caught: (%s, %s, %s)",
             guid,
             request.remote,
-            channel,
+            '|'.join(channels),
         )
 
 
@@ -197,16 +199,13 @@ def app():
     )
     webapp = web.Application()
     webapp['config'] = config
-    webapp['backend'] = MarmotServerBackend(
-        args.redis_url or config.server.redis.url,
-        args.redis_max_connections or config.server.redis.max_connections,
-    )
+    webapp['backend'] = MarmotServerBackend(redis_url, redis_max_connections)
     webapp['stop_event'] = Event()
     webapp.add_routes(
         [
             method(pattern, handler)
             for pattern, method, handler in [
-                ('/api/listen/{channel}', web.get, _listen),
+                ('/api/listen', web.get, _listen),
                 ('/api/whistle', web.post, _whistle),
             ]
         ]
