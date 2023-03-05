@@ -1,26 +1,4 @@
 """Marmot client
-
-MIT License
-
-Copyright (c) 2023 koromodako
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
 """
 from signal import SIGINT, SIGTERM
 from pathlib import Path
@@ -54,9 +32,9 @@ def _display(message: MarmotMessage):
     CONSOLE.print(line)
 
 
-async def _exec(script: Path, message: MarmotMessage):
+async def _exec(executable: Path, message: MarmotMessage):
     process = await create_subprocess_exec(
-        script,
+        executable,
         env={
             'MARMOT_MSG_LEVEL': message.level.name,
             'MARMOT_MSG_CHANNEL': message.channel,
@@ -76,8 +54,8 @@ async def _async_listen(args):
         marmot = Marmot(config, client)
         async for message in marmot.listen(set(args.channels), STOP_EVENT):
             _display(message)
-            if args.script:
-                await _exec(args.script, message)
+            if args.executable:
+                await _exec(args.executable, message)
 
 
 def _termination_handler():
@@ -107,7 +85,8 @@ def _parse_args():
     parser.add_argument('--host', help="marmot server host")
     parser.add_argument('--port', type=int, help="marmot server port")
     parser.add_argument(
-        '--exec',
+        '--executable',
+        '-e',
         type=Path,
         help="invoke executable with message properties passed in environment variables"
     )
@@ -125,9 +104,11 @@ def app():
     """Aplication entrypoint"""
     LOGGER.info(BANNER)
     args = _parse_args()
-    if args.script and not args.script.is_file():
-        args.script = None
-        LOGGER.warning("cannot find file, --script ignored: %s", args.script)
+    if args.executable and not args.executable.is_file():
+        args.executable = None
+        LOGGER.warning(
+            "cannot find file, --executable ignored: %s", args.executable
+        )
     try:
         args.func(args)
     except MarmotConfigError as exc:
