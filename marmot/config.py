@@ -5,10 +5,11 @@ from asyncio import new_event_loop, sleep
 from pathlib import Path
 from argparse import ArgumentParser
 from rich.box import ROUNDED
+from rich.text import Text
 from rich.tree import Tree
 from rich.panel import Panel
 from rich.table import Table
-from rich.prompt import Prompt
+from rich.prompt import Prompt, Confirm
 from rich.console import Console
 from .__version__ import version
 from .helper.config import (
@@ -32,18 +33,36 @@ from .helper.secret_provider import SECRET_PROVIDER, SecretProviderBackend
 
 BANNER = f"Marmot Config {version}"
 CONSOLE = Console()
+ADDED_STYLE = 'green'
+DELETED_STYLE = 'red'
+
+
+def _load_client_config(config: Path):
+    fs_config = MarmotConfig.from_filepath(config)
+    if not fs_config.client:
+        LOGGER.error("cannot find client configuration in: %s", config)
+        raise MarmotConfigError("cannot find client configuration")
+    return fs_config
+
+
+def _load_server_config(config: Path):
+    fs_config = MarmotConfig.from_filepath(config)
+    if not fs_config.server:
+        LOGGER.error("cannot find server configuration in: %s", config)
+        raise MarmotConfigError("cannot find server configuration")
+    return fs_config
 
 
 async def _init_client(args):
-    config = MarmotConfig()
+    fs_config = MarmotConfig()
     if args.config.is_file():
-        config = MarmotConfig.from_filepath(args.config)
-    if config.client:
+        fs_config = MarmotConfig.from_filepath(args.config)
+    if fs_config.client:
         LOGGER.warning(
             "client already initialized, client initialization canceled."
         )
         return
-    config.client = MarmotClientConfig(
+    fs_config.client = MarmotClientConfig(
         guid=str(uuid4()),
         url=(
             str(DEFAULT_MARMOT_URL)
@@ -67,19 +86,19 @@ async def _init_client(args):
     )
     if args.use_defaults:
         SECRET_PROVIDER.init(SecretProviderBackend.GENPASS, [])
-    config.to_filepath(args.config)
+    fs_config.to_filepath(args.config)
 
 
 async def _init_server(args):
-    config = MarmotConfig()
+    fs_config = MarmotConfig()
     if args.config.is_file():
-        config = MarmotConfig.from_filepath(args.config)
-    if config.server:
+        fs_config = MarmotConfig.from_filepath(args.config)
+    if fs_config.server:
         LOGGER.warning(
             "server already initialized, server initialization canceled."
         )
         return
-    config.server = MarmotServerConfig(
+    fs_config.server = MarmotServerConfig(
         host=(
             DEFAULT_MARMOT_HOST
             if args.use_defaults
@@ -114,149 +133,232 @@ async def _init_server(args):
         clients={},
         channels={},
     )
-    config.to_filepath(args.config)
+    fs_config.to_filepath(args.config)
 
 
 async def _show_client(args):
-    config = MarmotConfig.from_filepath(args.config)
-    if not config.client:
-        LOGGER.error("cannot find client configuration in: %s", args.config)
-        return
-    pubkey = config.client.prikey.public_key()
-    table = Table(title="Marmot Client Config", box=ROUNDED, expand=True)
-    table.add_column("Property")
-    table.add_column("Value")
-    table.add_row("guid", config.client.guid)
-    table.add_row("url", str(config.client.url))
+    fs_config = _load_client_config(args.config)
+    pubkey = fs_config.client.prikey.public_key()
+    table = Table(
+        "Property",
+        "Value",
+        title="Marmot Client Config",
+        box=ROUNDED,
+        expand=True,
+    )
+    table.add_row("guid", fs_config.client.guid)
+    table.add_row("url", str(fs_config.client.url))
     table.add_row("pubkey", dump_marmot_public_key(pubkey))
     CONSOLE.print(table)
 
 
 async def _show_server(args):
-    config = MarmotConfig.from_filepath(args.config)
-    if not config.server:
-        LOGGER.error("cannot find server configuration in: %s", args.config)
-        return
-    table = Table(title="Marmot Server Config", box=ROUNDED, expand=True)
-    table.add_column("Property")
-    table.add_column("Value")
-    table.add_row("host", config.server.host)
-    table.add_row("port", str(config.server.port))
-    table.add_row("redis.url", config.server.redis.url)
+    fs_config = _load_server_config(args.config)
+    table = Table(
+        "Property",
+        "Value",
+        title="Marmot Server Config",
+        box=ROUNDED,
+        expand=True,
+    )
+    table.add_row("host", fs_config.server.host)
+    table.add_row("port", str(fs_config.server.port))
+    table.add_row("redis.url", fs_config.server.redis.url)
     table.add_row(
-        "redis.max_connections", str(config.server.redis.max_connections)
+        "redis.max_connections", str(fs_config.server.redis.max_connections)
     )
     CONSOLE.print(table)
     table = Table(
-        title="Marmot Server Declared Clients", box=ROUNDED, expand=True
+        "GUID",
+        "Public Key",
+        title="Marmot Server Declared Clients",
+        box=ROUNDED,
+        expand=True,
     )
-    table.add_column("GUID")
-    table.add_column("Public Key")
-    for guid, pubkey in config.server.clients.items():
-        table.add_row(guid, dump_marmot_public_key(pubkey))
+    for fs_guid, fs_pubkey in fs_config.server.clients.items():
+        table.add_row(fs_guid, dump_marmot_public_key(fs_pubkey))
     CONSOLE.print(table)
-    root_node = Tree("server")
-    for name, channel in config.server.channels.items():
-        channel_node = root_node.add(name)
-        listeners_node = channel_node.add("listeners")
-        for listener in channel.listeners:
-            listeners_node.add(listener)
-        whistlers_node = channel_node.add("whistlers")
-        for whistler in channel.whistlers:
-            whistlers_node.add(whistler)
+    r_node = Tree("channels")
+    for fs_name in sorted(fs_config.server.channels.keys()):
+        fs_channel = fs_config.server.channels[fs_name]
+        c_node = r_node.add(fs_name)
+        l_node = c_node.add("listeners")
+        for listener in fs_channel.listeners:
+            l_node.add(listener)
+        w_node = c_node.add("whistlers")
+        for whistler in fs_channel.whistlers:
+            w_node.add(whistler)
     CONSOLE.print(
-        Panel(root_node, title="Marmot Server Declared Channels", box=ROUNDED)
+        Panel(r_node, title="Marmot Server Declared Channels", box=ROUNDED)
     )
 
 
 async def _add_client(args):
-    config = MarmotConfig.from_filepath(args.config)
-    config.server.add_client(args.guid, args.pubkey)
-    config.to_filepath(args.config)
+    fs_config = _load_server_config(args.config)
+    fs_config.server.add_client(args.guid, args.pubkey)
+    fs_config.to_filepath(args.config)
     LOGGER.info("client added: %s", args.guid)
 
 
 async def _del_client(args):
-    config = MarmotConfig.from_filepath(args.config)
-    config.server.del_client(args.guid)
-    config.to_filepath(args.config)
+    fs_config = _load_server_config(args.config)
+    fs_config.server.del_client(args.guid)
+    fs_config.to_filepath(args.config)
     LOGGER.info("client deleted: %s", args.guid)
 
 
 async def _add_channel(args):
-    config = MarmotConfig.from_filepath(args.config)
-    config.server.add_channel(args.channel)
-    config.to_filepath(args.config)
+    fs_config = _load_server_config(args.config)
+    fs_config.server.add_channel(args.channel)
+    fs_config.to_filepath(args.config)
     LOGGER.info("channel added: %s", args.channel)
 
 
 async def _del_channel(args):
-    config = MarmotConfig.from_filepath(args.config)
-    config.server.del_channel(args.channel)
-    config.to_filepath(args.config)
+    fs_config = _load_server_config(args.config)
+    fs_config.server.del_channel(args.channel)
+    fs_config.to_filepath(args.config)
     LOGGER.info("channel deleted: %s", args.channel)
 
 
 async def _add_whistler(args):
-    config = MarmotConfig.from_filepath(args.config)
-    config.server.add_whistler(args.channel, args.guid)
-    config.to_filepath(args.config)
+    fs_config = _load_server_config(args.config)
+    fs_config.server.add_whistler(args.channel, args.guid)
+    fs_config.to_filepath(args.config)
     LOGGER.info("whistler added: (%s, %s)", args.channel, args.guid)
 
 
 async def _del_whistler(args):
-    config = MarmotConfig.from_filepath(args.config)
-    config.server.del_whistler(args.channel, args.guid)
-    config.to_filepath(args.config)
+    fs_config = _load_server_config(args.config)
+    fs_config.server.del_whistler(args.channel, args.guid)
+    fs_config.to_filepath(args.config)
     LOGGER.info("whistler deleted: (%s, %s)", args.channel, args.guid)
 
 
 async def _add_listener(args):
-    config = MarmotConfig.from_filepath(args.config)
-    config.server.add_listener(args.channel, args.guid)
-    config.to_filepath(args.config)
+    fs_config = _load_server_config(args.config)
+    fs_config.server.add_listener(args.channel, args.guid)
+    fs_config.to_filepath(args.config)
     LOGGER.info("listener added: (%s, %s)", args.channel, args.guid)
 
 
 async def _del_listener(args):
-    config = MarmotConfig.from_filepath(args.config)
-    config.server.del_listener(args.channel, args.guid)
-    config.to_filepath(args.config)
+    fs_config = _load_server_config(args.config)
+    fs_config.server.del_listener(args.channel, args.guid)
+    fs_config.to_filepath(args.config)
     LOGGER.info("listener deleted: (%s, %s)", args.channel, args.guid)
 
 
 async def _diff(args):
-    config = MarmotConfig.from_filepath(args.config)
-    if not config.server:
-        LOGGER.error("cannot find server configuration in: %s", args.config)
-        return
+    fs_config = _load_server_config(args.config)
     backend = MarmotServerBackend(
-        args.redis_url or config.server.redis.url,
-        args.redis_max_connections or config.server.redis.max_connections,
+        args.redis_url or fs_config.server.redis.url,
+        args.redis_max_connections or fs_config.server.redis.max_connections,
     )
     try:
-        backend_config = await backend.dump()
+        be_config = await backend.dump()
     finally:
         await backend.close()
-    raise NotImplementedError
-
-
-async def _load(args):
-    config = MarmotConfig.from_filepath(args.config)
-    if not config.server:
-        LOGGER.error("cannot find server configuration in: %s", args.config)
-        return
-    backend = MarmotServerBackend(
-        args.redis_url or config.server.redis.url,
-        args.redis_max_connections or config.server.redis.max_connections,
+    table = Table(
+        "GUID",
+        "Public Key",
+        title="Marmot Server Declared Clients",
+        box=ROUNDED,
+        expand=True,
     )
-    LOGGER.info("loading config in backend...")
+    for be_guid, be_pubkey in be_config.server.clients.items():
+        style = (
+            DELETED_STYLE if be_guid not in fs_config.server.clients else None
+        )
+        table.add_row(be_guid, dump_marmot_public_key(be_pubkey), style=style)
+    for fs_guid, fs_pubkey in fs_config.server.clients.items():
+        if fs_guid in be_config.server.clients:
+            continue
+        table.add_row(
+            fs_guid, dump_marmot_public_key(fs_pubkey), style=ADDED_STYLE
+        )
+    CONSOLE.print(table)
+    r_node = Tree("channels")
+    for be_name in sorted(be_config.server.channels.keys()):
+        be_channel = be_config.server.channels[be_name]
+        fs_channel = fs_config.server.channels.get(be_name)
+        channel_style = DELETED_STYLE if not fs_channel else None
+        c_node = r_node.add(Text(be_name, style=channel_style))
+        l_node = c_node.add("listeners")
+        for listener in be_channel.listeners:
+            style = channel_style or (
+                DELETED_STYLE if listener not in fs_channel.listeners else None
+            )
+            l_node.add(Text(listener, style=style))
+        if fs_channel:
+            for listener in fs_channel.listeners:
+                if listener not in be_channel.listeners:
+                    l_node.add(Text(listener, style=ADDED_STYLE))
+        w_node = c_node.add("whistlers")
+        for whistler in be_channel.whistlers:
+            style = channel_style or (
+                DELETED_STYLE if whistler not in fs_channel.whistlers else None
+            )
+            w_node.add(Text(whistler, style=style))
+        if fs_channel:
+            for whistler in fs_channel.whistlers:
+                if whistler not in be_channel.whistlers:
+                    w_node.add(Text(whistler, style=ADDED_STYLE))
+    for fs_name in sorted(fs_config.server.channels.keys()):
+        fs_channel = fs_config.server.channels[fs_name]
+        if fs_name in be_config.server.channels:
+            continue
+        c_node = r_node.add(Text(fs_name, style=ADDED_STYLE))
+        l_node = c_node.add("listeners")
+        for listener in fs_channel.listeners:
+            l_node.add(Text(listener, style=ADDED_STYLE))
+        w_node = c_node.add("whistlers")
+        for whistler in fs_channel.whistlers:
+            w_node.add(Text(whistler, style=ADDED_STYLE))
+    CONSOLE.print(
+        Panel(r_node, title="Marmot Server Declared Channels", box=ROUNDED)
+    )
+
+
+async def _push(args):
+    LOGGER.warning(
+        "/!\\ changes made to fs config clients or channels will be published /!\\"
+    )
+    if not Confirm.ask("do you want to push config from fs to backend?"):
+        return
+    fs_config = _load_server_config(args.config)
+    backend = MarmotServerBackend(
+        args.redis_url or fs_config.server.redis.url,
+        args.redis_max_connections or fs_config.server.redis.max_connections,
+    )
+    LOGGER.info("pushing config to backend...")
     try:
-        await backend.load(config)
+        await backend.load(fs_config)
     finally:
         await backend.close()
-        await sleep(1)
-    LOGGER.info("loading done")
+    LOGGER.info("push is complete.")
+
+
+async def _pull(args):
+    LOGGER.warning(
+        "/!\\ changes made to fs config clients or channels will be lost /!\\"
+    )
+    if not Confirm.ask("do you want to pull config from backend to fs?"):
+        return
+    fs_config = _load_server_config(args.config)
+    backend = MarmotServerBackend(
+        args.redis_url or fs_config.server.redis.url,
+        args.redis_max_connections or fs_config.server.redis.max_connections,
+    )
+    LOGGER.info("pulling config from backend...")
+    try:
+        be_config = await backend.dump()
+    finally:
+        await backend.close()
+    fs_config.server.clients = be_config.server.clients
+    fs_config.server.channels = be_config.server.channels
+    fs_config.to_filepath(args.config)
+    LOGGER.info("pull is complete.")
 
 
 def _parse_args():
@@ -334,7 +436,8 @@ def _parse_args():
     del_listener.add_argument('guid', help="GUID of the listener to delete")
     del_listener.set_defaults(async_func=_del_listener)
     diff = cmd.add_parser(
-        'diff', help="Show differences between backend and config"
+        'diff',
+        help="Show what will happen when fs config is pushed to backend",
     )
     diff.add_argument(
         '--redis-url',
@@ -346,17 +449,28 @@ def _parse_args():
         help="Marmot redis max connections",
     )
     diff.set_defaults(async_func=_diff)
-    load = cmd.add_parser('load', help="Load config in backend")
-    load.add_argument(
+    push = cmd.add_parser('push', help="Push fs config to backend")
+    push.add_argument(
         '--redis-url',
         help="Marmot redis url, do not add credentials in this url",
     )
-    load.add_argument(
+    push.add_argument(
         '--redis-max-connections',
         type=int,
         help="Marmot redis max connections",
     )
-    load.set_defaults(async_func=_load)
+    push.set_defaults(async_func=_push)
+    pull = cmd.add_parser('pull', help="Pull backend config to fs")
+    pull.add_argument(
+        '--redis-url',
+        help="Marmot redis url, do not add credentials in this url",
+    )
+    pull.add_argument(
+        '--redis-max-connections',
+        type=int,
+        help="Marmot redis max connections",
+    )
+    pull.set_defaults(async_func=_pull)
     return parser.parse_args()
 
 

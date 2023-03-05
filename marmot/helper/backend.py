@@ -170,27 +170,36 @@ class MarmotServerBackend:
         for channel in channels:
             await self.trim(channel)
 
-    async def load(self, config: MarmotConfig):
+    async def load(self, fs_config: MarmotConfig):
         """Load marmot configuration as backend state"""
-        clients = set(await self._redis.hkeys(KEY_MARMOT_CLIENTS))
-        channels = set(await self._redis.smembers(KEY_MARMOT_CHANNELS))
-        clients_to_del = clients.difference(set(config.server.clients.keys()))
-        channels_to_del = channels.difference(
-            set(config.server.channels.keys())
+        # retrieve backened configuration
+        be_clients = set(await self._redis.hkeys(KEY_MARMOT_CLIENTS))
+        be_channels = set(await self._redis.smembers(KEY_MARMOT_CHANNELS))
+        # compute changes
+        clients_to_del = be_clients.difference(
+            set(fs_config.server.clients.keys())
         )
+        channels_to_del = be_channels.difference(
+            set(fs_config.server.channels.keys())
+        )
+        # apply changes
         for channel_to_del in channels_to_del:
             await self.del_channel(channel_to_del)
         for client_to_del in clients_to_del:
             await self.del_client(client_to_del)
-        for guid, pubkey in config.server.clients.items():
+        for guid, pubkey in fs_config.server.clients.items():
             await self.add_client(guid, pubkey)
-        for name, channel in config.server.channels.items():
+        for name, channel in fs_config.server.channels.items():
             await self.add_channel(name, channel)
 
     async def dump(self) -> MarmotConfig:
         """Dump backend state as marmot configuration"""
-        clients = set(await self._redis.hgetall(KEY_MARMOT_CLIENTS))
-        channels = []
+        clients = await self._redis.hgetall(KEY_MARMOT_CLIENTS)
+        clients = {
+            guid: load_marmot_public_key(pubkey)
+            for guid, pubkey in clients.items()
+        }
+        channels = {}
         channels_ = set(await self._redis.smembers(KEY_MARMOT_CHANNELS))
         for channel in channels_:
             listeners = await self._redis.hkeys(
@@ -199,8 +208,8 @@ class MarmotServerBackend:
             whistlers = await self._redis.smembers(
                 _marmot_channel_whistlers(channel)
             )
-            channels.append(
-                MarmotChannelConfig(listeners=listeners, whistlers=whistlers)
+            channels[channel] = MarmotChannelConfig(
+                listeners=set(listeners), whistlers=set(whistlers)
             )
         return MarmotConfig(
             server=MarmotServerConfig(

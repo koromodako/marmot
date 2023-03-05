@@ -192,14 +192,12 @@ def app():
         return
     host = args.host or config.server.host
     port = args.port or config.server.port
-    redis_url = args.redis_url or config.server.redis.url
-    redis_max_connections = min(
-        (args.redis_max_connections or config.server.redis.max_connections),
-        10,
-    )
     webapp = web.Application()
     webapp['config'] = config
-    webapp['backend'] = MarmotServerBackend(redis_url, redis_max_connections)
+    webapp['backend'] = MarmotServerBackend(
+        args.redis_url or config.server.redis.url,
+        args.redis_max_connections or config.server.redis.max_connections,
+    )
     webapp['stop_event'] = Event()
     webapp.add_routes(
         [

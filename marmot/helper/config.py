@@ -192,7 +192,7 @@ class MarmotServerConfig:
         if channel not in self.channels:
             LOGGER.warning("client does not exist, client deletion canceled.")
             return
-        self.channels[channel] = MarmotChannelConfig()
+        self.channels.pop(channel, None)
 
     def add_whistler(self, channel, guid):
         """Add whistler"""
