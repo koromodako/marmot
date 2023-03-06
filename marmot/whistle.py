@@ -58,7 +58,7 @@ def _parse_args():
         '--sp',
         type=SecretProviderBackend,
         default=SecretProviderBackend.GETPASS,
-        help=f"marmot secret provider, one of {{{SECRET_PROVIDERS}}}",
+        help=f"marmot secret provider, one of {{{','.join(SECRET_PROVIDERS)}}}",
     )
     parser.add_argument('--host', help="marmot server host")
     parser.add_argument('--port', type=int, help="marmot server port")
@@ -67,7 +67,7 @@ def _parse_args():
         '-l',
         type=MarmotMessageLevel,
         default=MarmotMessageLevel(getenv('MARMOT_MSG_LEVEL', 'INFO')),
-        help=f"marmot message level, one of {{{MARMOT_MESSAGE_LEVELS}}}",
+        help=f"marmot message level, one of {{{','.join(MARMOT_MESSAGE_LEVELS)}}}",
     )
     parser.add_argument(
         '--channel',

@@ -31,7 +31,7 @@ from .helper.config import (
 from .helper.crypto import generate_marmot_private_key, dump_marmot_public_key
 from .helper.backend import MarmotServerBackend
 from .helper.logging import LOGGER
-from .helper.secret_provider import SECRET_PROVIDER, SecretProviderBackend
+from .helper.secret_provider import SECRET_PROVIDER, SECRET_PROVIDERS, SecretProviderBackend
 
 
 BANNER = f"Marmot Config {version}"
@@ -399,7 +399,6 @@ async def _pull(args):
 
 
 def _parse_args():
-    secret_providers = ','.join([sp.value for sp in SecretProviderBackend])
     parser = ArgumentParser(description=BANNER)
     parser.add_argument(
         '--config',
@@ -437,7 +436,7 @@ def _parse_args():
         '--sp',
         type=SecretProviderBackend,
         default=SecretProviderBackend.GETPASS,
-        help=f"marmot secret provider, one of {{{secret_providers}}}",
+        help=f"marmot secret provider, one of {{{','.join(SECRET_PROVIDERS)}}}",
     )
     show_client.set_defaults(async_func=_show_client)
     show_server = cmd.add_parser(

@@ -92,7 +92,7 @@ def _parse_args():
         '--sp',
         type=SecretProviderBackend,
         default=SecretProviderBackend.GETPASS,
-        help=f"marmot secret provider, one of {{{SECRET_PROVIDERS}}}",
+        help=f"marmot secret provider, one of {{{','.join(SECRET_PROVIDERS)}}}",
     )
     parser.add_argument('--host', help="marmot server host")
     parser.add_argument('--port', type=int, help="marmot server port")
