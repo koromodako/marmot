@@ -21,6 +21,9 @@ class MarmotMessageLevel(Enum):
     DEBUG = 'DEBUG'
 
 
+MARMOT_MESSAGE_LEVELS = [lvl.value for lvl in MarmotMessageLevel]
+
+
 @dataclass
 class MarmotAPIMessage:
     """Marmot API message"""

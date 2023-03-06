@@ -57,10 +57,19 @@ listeners and whistlers without having to restart the server.
 Marmot listener can listen to several channels to receive notifications from
 whistlers.
 
-`--exec` argument allow forward message properties to an external executable
-using an interface based on environment variables. An example of such executable
-is `example/script.sh`. File permissions shall allow the user running `marmot-listen`
-to execute the file.
+`--executable` argument allow forward message properties to an third party
+executable using an interface based on environment variables. An example of such
+executable is `example/whistler-script.sh`. File permissions shall allow the user running
+`marmot-listen` to execute the file.
+
+Environment variables made available are described below.
+
+| Variable              | Description                                         |
+|:---------------------:|:----------------------------------------------------|
+| `MARMOT_MSG_LEVEL`    | Level of the message in {`CRITICAL`,`ERROR`,`WARNING`,`INFO`,`DEBUG`} |
+| `MARMOT_MSG_CHANNEL`  | Name of the channel in which the message was published |
+| `MARMOT_MSG_WHISTLER` | GUID of the whistler sending the message |
+| `MARMOT_MSG_CONTENT`  | Content of the message |
 
 
 ### marmot-whistle
@@ -87,7 +96,38 @@ the server. This can be achieved pretty easily using `marmot-config` command.
 
 ## Setup
 
-### Client 
+### Server docker setup (testing)
+
+Docker setup itself is not covered here. These steps might reference `compose.yml`
+variables. All commands are relative to marmot directory cloned in step `01`.
+
+| Step | Description |
+|:----:|:------------|
+| `01`  | Clone this repository: `git clone https://github.com/koromodako/marmot` |
+| `02`  | Create a virtual environment: `python3 -m venv venv` |
+| `03`  | Activate virtual environment: `source venv/bin/activate` |
+| `04`  | Install marmot: `python -m pip install .` |
+| `05`  | Install build packages: `python -m pip install build` |
+| `06`  | Build marmot package: `python -m build` |
+| `07`  | Generate test certificate chain: `scripts/generate-test-cert-chain.py` |
+| `08`  | Generate test configuration files: `scripts/generate-test-config.py > /tmp/marmot-testing/clients-creds.unsafe` |
+| `09`  | Create `marmot-server` container persistent volume: `mkdir -p /data/services/marmot/server/data` |
+| `10`  | Copy `marmot-server` configuration file: `cp /tmp/marmot-testing/config/ms.json /data/services/marmot/server/data/marmot.json` |
+| `11`  | Create `marmot-redis` container persistent volume: `mkdir -p /data/services/marmot/redis/{etc,data}` |
+| `12`  | Instanciate redis configuration: `cp docker/redis/redis.conf /data/services/marmot/redis/etc/` |
+| `13`  | Customize redis configuration: `/data/services/marmot/redis/etc/redis.conf` |
+| `14`  | Create `marmot-nginx` container peristent volume: `mkdir -p /data/services/marmot/redis/etc` |
+| `15`  | Provide key pair: `/data/services/marmot/nginx/etc/api.marmot.org.{crt,key}.pem` |
+| `16`  | Generate DH parameters file: `openssl dhparam -out /data/services/marmot/nginx/etc/dhparam.pem 2048` |
+| `17`  | Instanciate nginx configuration: `cp docker/nginx/marmot.conf /data/services/marmot/nginx/etc/` |
+| `18`  | Customize nginx configuration: `/data/services/marmot/nginx/etc/marmot.conf` |
+| `19`  | Move to marmot docker directory: `cd docker/marmot` |
+| `20`  | Build docker image: `./build.sh` |
+| `21`  | Move up to docker directory: `cd ..` |
+| `22`  | Start docker deployment: `sudo docker compose up` |
+
+
+### Client
 
 | Step | Description |
 |:----:|:------------|
@@ -98,45 +138,6 @@ the server. This can be achieved pretty easily using `marmot-config` command.
 | `05` | Retrieve client information: `marmot-config show-client` |
 | `06` | Give your GUID and Public Key to the marmot server administrator |
 | `07` | The administrator will assign permissions so that you can `marmot-listen` or `marmot-whistle` |
-
-
-### Server
-
-This documentation does not cover production-ready and secure deployments. It
-assumes best practices are followed regarding Nginx and Redis servers deployment.
-
-
-#### Docker setup
-
-Docker setup is not covered here.
-
-| Step | Description |
-|:----:|:------------|
-| `01`  | Clone this repository: `git clone https://github.com/koromodako/marmot` |
-| `02`  | Create a virtual environment: `python3 -m venv venv` |
-| `03`  | Activate virtual environment: `source venv/bin/activate` |
-| `04`  | Setup build packages: `python -m pip install build` |
-| `05`  | Build marmot package: `python -m build` |
-| `06`  | Move to marmot docker directory: `cd docker/marmot` |
-| `07`  | Build docker image: `./build.sh` |
-| `08`  | Move up to docker directory: `cd ..` |
-| `09`  | Start docker deployment: `sudo docker compose up` |
-| `10`  | Configure the server: `sudo docker compose exec marmot-server /bin/sh` |
-| `11`  | Use `marmot-config` inside the container |
-
-
-#### Native setup
-
-| Step | Description |
-|:----:|:------------|
-| `01` | Setup `nginx` and ensure the service is started |
-| `02` | Instanciate nginx configuration using template `marmot.nginx.conf` |
-| `03` | Provide adequate certificates using your own PKI |
-| `04` | Restart `nginx` service |
-| `05` | Setup `redis-server` and ensure the service is started |
-| `06` | Setup the server following the same procedure as client setup |
-| `07` | Initialize server configuration: `marmot-config init-server` |
-| `08` | Start the server: `marmot-server` |
 
 
 ## Security

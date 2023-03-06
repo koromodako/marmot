@@ -1,6 +1,7 @@
 """Marmot config application
 """
 from re import compile as re_compile
+from json import dumps
 from uuid import uuid4
 from asyncio import new_event_loop
 from pathlib import Path
@@ -104,7 +105,7 @@ async def _init_client(args):
         prikey=generate_marmot_private_key(),
     )
     if args.use_defaults:
-        SECRET_PROVIDER.init(SecretProviderBackend.GENPASS, [])
+        SECRET_PROVIDER.select(SecretProviderBackend.GENPASS)
     fs_config.to_filepath(args.config)
 
 
@@ -156,8 +157,21 @@ async def _init_server(args):
 
 
 async def _show_client(args):
+    SECRET_PROVIDER.select(args.secret_provider)
     fs_config = _load_client_config(args.config)
     pubkey = fs_config.client.prikey.public_key()
+    if args.json:
+        print(
+            dumps(
+                {
+                    'guid': fs_config.client.guid,
+                    'url': str(fs_config.client.url),
+                    'capath': str(fs_config.client.capath),
+                    'pubkey': dump_marmot_public_key(pubkey),
+                }
+            )
+        )
+        return
     table = Table(
         "Property",
         "Value",
@@ -167,12 +181,16 @@ async def _show_client(args):
     )
     table.add_row("guid", fs_config.client.guid)
     table.add_row("url", str(fs_config.client.url))
+    table.add_row("capath", str(fs_config.client.capath))
     table.add_row("pubkey", dump_marmot_public_key(pubkey))
     CONSOLE.print(table)
 
 
 async def _show_server(args):
     fs_config = _load_server_config(args.config)
+    if args.json:
+        print(dumps(fs_config.server.to_dict()))
+        return
     table = Table(
         "Property",
         "Value",
@@ -381,6 +399,7 @@ async def _pull(args):
 
 
 def _parse_args():
+    secret_providers = ','.join([sp.value for sp in SecretProviderBackend])
     parser = ArgumentParser(description=BANNER)
     parser.add_argument(
         '--config',
@@ -412,10 +431,19 @@ def _parse_args():
     show_client = cmd.add_parser(
         'show-client', help="show client configuration"
     )
+    show_client.add_argument('--json', action='store_true', help="JSON output")
+    show_client.add_argument(
+        '--secret-provider',
+        '--sp',
+        type=SecretProviderBackend,
+        default=SecretProviderBackend.GETPASS,
+        help=f"marmot secret provider, one of {{{secret_providers}}}",
+    )
     show_client.set_defaults(async_func=_show_client)
     show_server = cmd.add_parser(
         'show-server', help="show server configuration"
     )
+    show_server.add_argument('--json', action='store_true', help="JSON output")
     show_server.set_defaults(async_func=_show_server)
     add_client = cmd.add_parser('add-client', help="add a client")
     add_client.add_argument('guid', help="guid of the client to add")

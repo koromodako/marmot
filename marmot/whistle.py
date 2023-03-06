@@ -6,9 +6,14 @@ from asyncio import new_event_loop
 from argparse import ArgumentParser
 from . import Marmot, MarmotRole, MarmotMessage
 from .__version__ import version
-from .helper.api import MarmotMessageLevel
+from .helper.api import MARMOT_MESSAGE_LEVELS, MarmotMessageLevel
 from .helper.config import MarmotConfig, MarmotConfigError
 from .helper.logging import LOGGER
+from .helper.secret_provider import (
+    SECRET_PROVIDER,
+    SECRET_PROVIDERS,
+    SecretProviderBackend,
+)
 
 
 BANNER = f"Marmot Whistle {version}"
@@ -40,7 +45,6 @@ def _whistle(args):
 
 
 def _parse_args():
-    levels = ','.join([lvl.value for lvl in MarmotMessageLevel])
     parser = ArgumentParser(description=BANNER)
     parser.add_argument(
         '--config',
@@ -49,6 +53,13 @@ def _parse_args():
         default=Path('marmot.json'),
         help="marmot configuration file",
     )
+    parser.add_argument(
+        '--secret-provider',
+        '--sp',
+        type=SecretProviderBackend,
+        default=SecretProviderBackend.GETPASS,
+        help=f"marmot secret provider, one of {{{SECRET_PROVIDERS}}}",
+    )
     parser.add_argument('--host', help="marmot server host")
     parser.add_argument('--port', type=int, help="marmot server port")
     parser.add_argument(
@@ -56,7 +67,7 @@ def _parse_args():
         '-l',
         type=MarmotMessageLevel,
         default=MarmotMessageLevel(getenv('MARMOT_MSG_LEVEL', 'INFO')),
-        help=f"marmot message level, one of {{{levels}}}",
+        help=f"marmot message level, one of {{{MARMOT_MESSAGE_LEVELS}}}",
     )
     parser.add_argument(
         '--channel',
@@ -76,6 +87,7 @@ def app():
     """Aplication entrypoint"""
     LOGGER.info(BANNER)
     args = _parse_args()
+    SECRET_PROVIDER.select(args.secret_provider)
     try:
         args.func(args)
     except MarmotConfigError as exc:

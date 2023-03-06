@@ -10,6 +10,7 @@ from cryptography.hazmat.primitives.serialization import (
     Encoding,
     PublicFormat,
     PrivateFormat,
+    NoEncryption,
     BestAvailableEncryption,
     load_der_public_key,
     load_der_private_key,
@@ -57,14 +58,12 @@ def load_marmot_private_key(b64_der_data: str) -> MarmotPrivateKey:
 def dump_marmot_private_key(prikey: MarmotPrivateKey) -> str:
     """Dump a passphrase protected private key"""
     secret = SECRET_PROVIDER.fetch()
-    if not secret:
-        secret = None
+    encryption = BestAvailableEncryption(secret) if secret else NoEncryption()
     der_data = prikey.private_bytes(
         Encoding.DER,
         PrivateFormat.PKCS8,
-        BestAvailableEncryption(secret),
+        encryption,
     )
-    LOGGER.info("passphrase is correct.")
     return b64encode(der_data).decode()
 
 

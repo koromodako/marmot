@@ -11,6 +11,11 @@ from .__version__ import version
 from .helper.api import MarmotMessageLevel
 from .helper.config import MarmotConfig, MarmotConfigError
 from .helper.logging import LOGGER
+from .helper.secret_provider import (
+    SECRET_PROVIDER,
+    SECRET_PROVIDERS,
+    SecretProviderBackend,
+)
 
 
 BANNER = f"Marmot Listen {version}"
@@ -82,13 +87,20 @@ def _parse_args():
         default=Path('marmot.json'),
         help="marmot client configuration file",
     )
+    parser.add_argument(
+        '--secret-provider',
+        '--sp',
+        type=SecretProviderBackend,
+        default=SecretProviderBackend.GETPASS,
+        help=f"marmot secret provider, one of {{{SECRET_PROVIDERS}}}",
+    )
     parser.add_argument('--host', help="marmot server host")
     parser.add_argument('--port', type=int, help="marmot server port")
     parser.add_argument(
         '--executable',
         '-e',
         type=Path,
-        help="invoke executable with message properties passed in environment variables"
+        help="invoke executable with message properties passed in environment variables",
     )
     parser.add_argument(
         'channels',
@@ -104,6 +116,7 @@ def app():
     """Aplication entrypoint"""
     LOGGER.info(BANNER)
     args = _parse_args()
+    SECRET_PROVIDER.select(args.secret_provider)
     if args.executable and not args.executable.is_file():
         args.executable = None
         LOGGER.warning(

@@ -1,38 +1,45 @@
+#!/usr/bin/env python3
 """Generate test certificate chain including test CA certificate
 
 TESTING ONLY, UNSAFE FOR PRODUCTION!
 """
+from sys import exit as sys_exit
 import typing as t
 from uuid import uuid4
 from pathlib import Path
 from getpass import getpass
 from datetime import timedelta, datetime
 from argparse import ArgumentParser
-from cryptography.x509 import (
-    Name,
-    DNSName,
-    NameAttribute,
-    BasicConstraints,
-    SubjectAlternativeName,
-    Certificate,
-    CertificateBuilder,
-    CertificateSigningRequest,
-    CertificateSigningRequestBuilder,
-    random_serial_number,
-)
-from cryptography.x509.oid import NameOID
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.hashes import SHA256
-from cryptography.hazmat.primitives.asymmetric.rsa import (
-    RSAPrivateKey,
-    generate_private_key,
-)
-from cryptography.hazmat.primitives.serialization import (
-    Encoding,
-    PrivateFormat,
-    NoEncryption,
-    BestAvailableEncryption,
-)
+
+try:
+    from cryptography.x509 import (
+        Name,
+        DNSName,
+        NameAttribute,
+        BasicConstraints,
+        SubjectAlternativeName,
+        Certificate,
+        CertificateBuilder,
+        CertificateSigningRequest,
+        CertificateSigningRequestBuilder,
+        random_serial_number,
+    )
+    from cryptography.x509.oid import NameOID
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives.hashes import SHA256
+    from cryptography.hazmat.primitives.asymmetric.rsa import (
+        RSAPrivateKey,
+        generate_private_key,
+    )
+    from cryptography.hazmat.primitives.serialization import (
+        Encoding,
+        PrivateFormat,
+        NoEncryption,
+        BestAvailableEncryption,
+    )
+except ImportError:
+    print("please install 'cryptography' package.")
+    sys_exit(1)
 
 
 UTC_NOW = datetime.utcnow()
@@ -69,9 +76,9 @@ def _generate_private_key(
     return private_key
 
 
-def _generate_ca(
-    keypath: Path, crtpath: Path
-) -> t.Tuple[PrivateKey, Certificate]:
+def _generate_ca(output_directory: Path) -> t.Tuple[PrivateKey, Certificate]:
+    keypath = output_directory / 'marmot.ca.key.pem'
+    crtpath = output_directory / 'marmot.ca.crt.pem'
     passphrase = getpass("please type CA key passphrase: ")
     ca_key = _generate_private_key(keypath, passphrase)
     subject = issuer = Name(
@@ -103,7 +110,11 @@ def _generate_ca(
     return ca_key, ca_crt
 
 
-def _generate_csr(keypath: Path, csrpath: Path) -> CertificateSigningRequest:
+def _generate_csr(
+    common_name: str, output_directory: Path
+) -> CertificateSigningRequest:
+    keypath = output_directory / f'{common_name}.key.pem'
+    csrpath = output_directory / f'{common_name}.csr.pem'
     private_key = _generate_private_key(keypath)
     csr = (
         CertificateSigningRequestBuilder()
@@ -116,14 +127,14 @@ def _generate_csr(keypath: Path, csrpath: Path) -> CertificateSigningRequest:
                     ),
                     NameAttribute(NameOID.LOCALITY_NAME, "Marmot Mount"),
                     NameAttribute(NameOID.ORGANIZATION_NAME, "Marmot Company"),
-                    NameAttribute(NameOID.COMMON_NAME, "api.marmot.org"),
+                    NameAttribute(NameOID.COMMON_NAME, common_name),
                 ]
             )
         )
         .add_extension(
             SubjectAlternativeName(
                 [
-                    DNSName("api.marmot.org"),
+                    DNSName(common_name),
                 ]
             ),
             critical=False,
@@ -135,11 +146,13 @@ def _generate_csr(keypath: Path, csrpath: Path) -> CertificateSigningRequest:
 
 
 def _sign_csr(
-    crtpath: Path,
+    common_name: str,
+    output_directory: Path,
     csr: CertificateSigningRequest,
     ca_key: PrivateKey,
     ca_crt: Certificate,
 ) -> Certificate:
+    crtpath = output_directory / f'{common_name}.crt.pem'
     crt = (
         CertificateBuilder()
         .subject_name(csr.subject)
@@ -159,10 +172,17 @@ def _parse_args():
         description="Generate test certificate chain including test CA certificate"
     )
     parser.add_argument(
-        '--cn', default='api.marmot.org', help="Certificate common name"
+        '--common-name',
+        '-n',
+        default='api.marmot.org',
+        help="Certificate common name",
     )
     parser.add_argument(
-        '--outdir', type=Path, default=Path('.'), help="Output directory"
+        '--output-directory',
+        '-o',
+        type=Path,
+        default=Path('/tmp/marmot-testing'),
+        help="Output directory",
     )
     return parser.parse_args()
 
@@ -170,13 +190,11 @@ def _parse_args():
 def app():
     """Application entry point"""
     args = _parse_args()
-    ca_key, ca_crt = _generate_ca(
-        args.outdir / 'marmot.ca.key.pem', args.outdir / 'marmot.ca.crt.pem'
-    )
-    csr = _generate_csr(
-        args.outdir / f'{args.cn}.key.pem', args.outdir / f'{args.cn}.csr.pem'
-    )
-    _sign_csr(args.outdir / f'{args.cn}.crt.pem', csr, ca_key, ca_crt)
+    args.output_directory /= 'ssl'
+    args.output_directory.mkdir(parents=True, exist_ok=True)
+    ca_key, ca_crt = _generate_ca(args.output_directory)
+    csr = _generate_csr(args.common_name, args.output_directory)
+    _sign_csr(args.common_name, args.output_directory, csr, ca_key, ca_crt)
 
 
 if __name__ == '__main__':
