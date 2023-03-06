@@ -1,9 +1,10 @@
 # marmot
 
-## Introduction
+## Intro
 
 This project is at an early stage of testing, security issues and bugs might be
-lurking in the corners, use with caution.
+lurking in the corners, use with caution. This documentation might be incomplete
+as it currently is a work in progress.
 
 
 ## Usage
@@ -106,9 +107,9 @@ variables. All commands are relative to marmot directory cloned in step `01`.
 | `01`  | Clone this repository: `git clone https://github.com/koromodako/marmot` |
 | `02`  | Create a virtual environment: `python3 -m venv venv` |
 | `03`  | Activate virtual environment: `source venv/bin/activate` |
-| `04`  | Install marmot: `python -m pip install .` |
-| `05`  | Install build packages: `python -m pip install build` |
-| `06`  | Build marmot package: `python -m build` |
+| `04`  | Update pip to latest version: `python -m pip install -U pip` |
+| `05`  | Install marmot package: `python -m pip install .` |
+| `06`  | Install build package: `python -m pip install build` |
 | `07`  | Generate test certificate chain: `scripts/generate-test-cert-chain.py` |
 | `08`  | Generate test configuration files: `scripts/generate-test-config.py > /tmp/marmot-testing/clients-creds.unsafe` |
 | `09`  | Create `marmot-server` container persistent volume: `mkdir -p /data/services/marmot/server/data` |
@@ -137,7 +138,7 @@ variables. All commands are relative to marmot directory cloned in step `01`.
 | `04` | Initialize client configuration: `marmot-config init-client` |
 | `05` | Retrieve client information: `marmot-config show-client` |
 | `06` | Give your GUID and Public Key to the marmot server administrator |
-| `07` | The administrator will assign permissions so that you can `marmot-listen` or `marmot-whistle` |
+| `07` | The administrator will reply with marmot CA certificate |
 
 
 ## Security
