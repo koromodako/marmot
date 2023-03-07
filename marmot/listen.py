@@ -119,7 +119,7 @@ def _parse_args():
 
 def app():
     """Aplication entrypoint"""
-    LOGGER.info(BANNER)
+    LOGGER.info(BANNER, extra={'highlighter': None})
     args = _parse_args()
     SECRET_PROVIDER.select(args.secret_provider)
     if args.executable and not args.executable.is_file():

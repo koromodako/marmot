@@ -44,7 +44,7 @@ class MarmotServerBackend:
         self._redis = Redis.from_url(
             url,
             encoding='utf-8',
-            max_connections=min(max_connections, 10),
+            max_connections=min(max(max_connections, 10), 2 ** 15),
             decode_responses=True,
         )
 

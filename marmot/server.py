@@ -123,11 +123,14 @@ async def _whistle(request):
     return web.json_response({'published': published})
 
 
-async def _backend_trim_task(backend):
+async def _backend_trim_task(webapp):
     """Trim backend channels every 20 seconds"""
+    config = webapp['config']
+    backend = webapp['backend']
+    trim_freq = min(max(config.server.server.redis.trim_freq, 60), 3600)
     while True:
         await backend.trim_all()
-        await sleep(20)
+        await sleep(trim_freq)
 
 
 async def _on_startup(webapp):
@@ -137,9 +140,7 @@ async def _on_startup(webapp):
     await webapp['backend'].load(webapp['config'])
     LOGGER.info("starting background tasks...")
     webapp['background_tasks'] = []
-    for name, task in (
-        ('backend_trim_task', _backend_trim_task(webapp['backend'])),
-    ):
+    for name, task in (('backend_trim_task', _backend_trim_task(webapp)),):
         LOGGER.info("starting task: %s", name)
         webapp['background_tasks'].append(create_task(task, name=name))
 
@@ -190,7 +191,7 @@ def _parse_args():
 
 def app():
     """Application entrypoint"""
-    LOGGER.info(BANNER)
+    LOGGER.info(BANNER, extra={'highlighter': None})
     args = _parse_args()
     try:
         config = MarmotConfig.from_filepath(args.config)

@@ -23,6 +23,7 @@ from .helper.config import (
     MarmotServerConfig,
     DEFAULT_REDIS_URL,
     DEFAULT_REDIS_MAXCONN,
+    DEFAULT_REDIS_TRIMFREQ,
     DEFAULT_MARMOT_HOST,
     DEFAULT_MARMOT_PORT,
     DEFAULT_MARMOT_URL,
@@ -31,7 +32,11 @@ from .helper.config import (
 from .helper.crypto import generate_marmot_private_key, dump_marmot_public_key
 from .helper.backend import MarmotServerBackend
 from .helper.logging import LOGGER
-from .helper.secret_provider import SECRET_PROVIDER, SECRET_PROVIDERS, SecretProviderBackend
+from .helper.secret_provider import (
+    SECRET_PROVIDER,
+    SECRET_PROVIDERS,
+    SecretProviderBackend,
+)
 
 
 BANNER = f"Marmot Config {version}"
@@ -127,7 +132,7 @@ async def _init_server(args):
             )
         ),
         port=int(
-            str(DEFAULT_MARMOT_PORT)
+            DEFAULT_MARMOT_PORT
             if args.use_defaults
             else Prompt.ask(
                 "please enter marmot port", default=str(DEFAULT_MARMOT_PORT)
@@ -141,8 +146,16 @@ async def _init_server(args):
                     "please enter redis url", default=DEFAULT_REDIS_URL
                 )
             ),
+            trim_freq=int(
+                DEFAULT_REDIS_TRIMFREQ
+                if args.use_defaults
+                else Prompt.ask(
+                    "please enter redis trim frequency",
+                    default=str(DEFAULT_REDIS_TRIMFREQ),
+                )
+            ),
             max_connections=int(
-                str(DEFAULT_REDIS_MAXCONN)
+                DEFAULT_REDIS_MAXCONN
                 if args.use_defaults
                 else Prompt.ask(
                     "please enter redis max connections",
@@ -201,6 +214,7 @@ async def _show_server(args):
     table.add_row("host", fs_config.server.host)
     table.add_row("port", str(fs_config.server.port))
     table.add_row("redis.url", _redact_redis_url(fs_config.server.redis.url))
+    table.add_row("redis.trim_freq", str(fs_config.server.redis.trim_freq))
     table.add_row(
         "redis.max_connections", str(fs_config.server.redis.max_connections)
     )
@@ -359,7 +373,8 @@ async def _diff(args):
 
 async def _push(args):
     LOGGER.warning(
-        "/!\\ changes made to fs config clients or channels will be published /!\\"
+        "[red]!!! BACKEND CONFIG WILL BE REPLACED !!![/]",
+        extra={'markup': True},
     )
     if not Confirm.ask("do you want to push config from fs to backend?"):
         return
@@ -378,7 +393,8 @@ async def _push(args):
 
 async def _pull(args):
     LOGGER.warning(
-        "/!\\ changes made to fs config clients or channels will be lost /!\\"
+        "[red]!!! FILESYSTEM CONFIG WILL BE REPLACED !!![/]",
+        extra={'markup': True},
     )
     if not Confirm.ask("do you want to pull config from backend to fs?"):
         return
@@ -522,7 +538,7 @@ def _parse_args():
 
 def app():
     """Aplication entrypoint"""
-    LOGGER.info(BANNER)
+    LOGGER.info(BANNER, extra={'highlighter': None})
     args = _parse_args()
     loop = new_event_loop()
     try:

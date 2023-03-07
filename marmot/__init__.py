@@ -63,7 +63,10 @@ class Marmot:
         LOGGER.info("connecting to %s", config.client.url)
         is_secure = config.client.url.scheme == 'https'
         if not is_secure:
-            LOGGER.critical("/!\\ USING INSECURE PROTOCOL /!\\")
+            LOGGER.warning(
+                "[red]!!! USING INSECURE PROTOCOL !!![/]",
+                extra={'markup': True},
+            )
             if not Confirm.ask("do you accept the risk?"):
                 raise KeyboardInterrupt
         sslctx = (

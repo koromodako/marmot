@@ -23,6 +23,7 @@ CHANNEL_PATTERN = re_compile(r'[a-z_]+(::[a-z_])*')
 
 DEFAULT_REDIS_URL = 'redis://localhost'
 DEFAULT_REDIS_MAXCONN = 50
+DEFAULT_REDIS_TRIMFREQ = 300
 DEFAULT_MARMOT_HOST = '127.0.0.1'
 DEFAULT_MARMOT_PORT = 1758
 DEFAULT_MARMOT_URL = URL.build(
@@ -79,6 +80,7 @@ class MarmotRedisConfig:
     """Marmot redis configuration"""
 
     url: str = DEFAULT_REDIS_URL
+    trim_freq: int = DEFAULT_REDIS_TRIMFREQ
     max_connections: int = DEFAULT_REDIS_MAXCONN
 
     @classmethod
@@ -86,6 +88,7 @@ class MarmotRedisConfig:
         """Create configuration object from dict"""
         return cls(
             url=dct.get('url', DEFAULT_REDIS_URL),
+            trim_freq=int(dct.get('trim_freq', DEFAULT_REDIS_TRIMFREQ)),
             max_connections=int(
                 dct.get('max_connections', DEFAULT_REDIS_MAXCONN)
             ),
@@ -95,6 +98,7 @@ class MarmotRedisConfig:
         """Convert configuration object to JSON serializable dict"""
         return {
             'url': self.url,
+            'trim_freq': self.trim_freq,
             'max_connections': self.max_connections,
         }
 

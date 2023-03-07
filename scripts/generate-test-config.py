@@ -4,8 +4,17 @@
 from pathlib import Path
 from argparse import ArgumentParser
 from marmot.helper.crypto import generate_marmot_private_key
-from marmot.helper.config import MarmotConfig, MarmotServerConfig, MarmotClientConfig, MarmotChannelConfig, MarmotRedisConfig
-from marmot.helper.secret_provider import SECRET_PROVIDER, SecretProviderBackend
+from marmot.helper.config import (
+    MarmotConfig,
+    MarmotServerConfig,
+    MarmotClientConfig,
+    MarmotChannelConfig,
+    MarmotRedisConfig,
+)
+from marmot.helper.secret_provider import (
+    SECRET_PROVIDER,
+    SecretProviderBackend,
+)
 
 LISTENERS = 'l'
 WHISTLERS = 'w'
@@ -40,7 +49,9 @@ def _create_client(args, guid: str):
         client=MarmotClientConfig(
             guid=guid,
             url='https://api.marmot.org',
-            capath=(args.output_directory.parent / 'ssl' / 'marmot.ca.crt.pem'),
+            capath=(
+                args.output_directory.parent / 'ssl' / 'marmot.ca.crt.pem'
+            ),
             prikey=private_key,
         )
     )
@@ -93,7 +104,6 @@ def app():
         )
     )
     _write_config(args.output_directory / 'ms.json', fs_config)
-
 
 
 if __name__ == '__main__':
