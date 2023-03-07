@@ -1,6 +1,7 @@
 """Marmot client
 """
 from os import getenv
+from json import dumps
 from pathlib import Path
 from asyncio import new_event_loop
 from argparse import ArgumentParser
@@ -35,7 +36,11 @@ async def _async_whistle(args):
                 )
             ]
         )
-        print(f"published: {published}")
+        if args.json:
+            output = dumps({'published': published})
+        else:
+            output = "success" if published[0] else "failure"
+        print(output)
 
 
 def _whistle(args):
@@ -60,6 +65,7 @@ def _parse_args():
         default=SecretProviderBackend.GETPASS,
         help=f"marmot secret provider, one of {{{','.join(SECRET_PROVIDERS)}}}",
     )
+    parser.add_argument('--json', action='store_true', help="JSON output")
     parser.add_argument('--host', help="marmot server host")
     parser.add_argument('--port', type=int, help="marmot server port")
     parser.add_argument(

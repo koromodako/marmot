@@ -29,15 +29,15 @@ For marmot server everything else is applicable.
 - `add-client` registers a client in the server configuration. Clients must be
   registered before being authorized to listen or whistle using `add-listener`
   and `add-whistler`.
-- `del-client` unregisters a client in the server configuration.
+- `rem-client` unregisters a client in the server configuration.
 - `add-channel` creates a channel in the server. Channel must be created before
   adding listeners and whistlers to it.
-- `del-channel` deletes a channel in the server.
+- `rem-channel` deletes a channel in the server.
 - `add-whistler` authorize a client to whistle in a channel.
-- `del-whistler` client will not be authorized to whistle in given channel until
+- `rem-whistler` client will not be authorized to whistle in given channel until
   reauthorized.
 - `add-listener` authorize a client to listen to a channel.
-- `del-listener` client will not be authorized to listen in given channel until
+- `rem-listener` client will not be authorized to listen in given channel until
   reauthorized.
 
 Marmot server makes it possible to change some of its configuration at runtime.

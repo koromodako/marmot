@@ -1,5 +1,6 @@
 """Marmot client
 """
+from json import dumps
 from signal import SIGINT, SIGTERM
 from pathlib import Path
 from asyncio import Event, new_event_loop, create_subprocess_exec
@@ -58,7 +59,10 @@ async def _async_listen(args):
     async with Marmot.create_client(MarmotRole.LISTENER, config) as client:
         marmot = Marmot(config, client)
         async for message in marmot.listen(set(args.channels), STOP_EVENT):
-            _display(message)
+            if args.json:
+                print(dumps(message.to_dict()))
+            else:
+                _display(message)
             if args.executable:
                 await _exec(args.executable, message)
 
@@ -94,6 +98,7 @@ def _parse_args():
         default=SecretProviderBackend.GETPASS,
         help=f"marmot secret provider, one of {{{','.join(SECRET_PROVIDERS)}}}",
     )
+    parser.add_argument('--json', action='store_true', help="JSON output")
     parser.add_argument('--host', help="marmot server host")
     parser.add_argument('--port', type=int, help="marmot server port")
     parser.add_argument(

@@ -51,6 +51,9 @@ class MarmotServerBackend:
     async def close(self):
         """Close underlying redis connections"""
         await self._redis.close()
+        # building Redis instance using from_url implies that we need to close
+        # the underlying connection_pool explicitly
+        await self._redis.connection_pool.disconnect()
 
     async def add_client(self, guid: str, pubkey: MarmotPublicKey):
         """Add or update a client"""
@@ -58,42 +61,52 @@ class MarmotServerBackend:
             KEY_MARMOT_CLIENTS, guid, dump_marmot_public_key(pubkey)
         )
 
-    async def del_client(self, guid: str):
+    async def rem_client(self, guid: str):
         """Delete a client"""
+        # remove client from the list
         await self._redis.hdel(KEY_MARMOT_CLIENTS, guid)
+        # iterate channels to remove client from listeners
         async for key in self._redis.scan_iter(_marmot_channel_listeners('*')):
             await self._redis.hdel(key, guid)
+        # iterate channels to remove client from whistlers
         async for key in self._redis.scan_iter(_marmot_channel_whistlers('*')):
             await self._redis.srem(key, guid)
 
     async def add_channel(self, name: str, channel: MarmotChannelConfig):
         """Add or update a channel"""
-        # intialize channel's stream
+        # ensure channel stream exists
         key = _marmot_channel_stream(name)
         count = await self._redis.exists(key)
         if count == 0:
-            last_message_id = await self._redis.xadd(
-                key, MarmotAPIMessage().to_dict()
-            )
-        else:
-            info = await self._redis.xinfo_stream(key)
-            last_message_id = info['last-generated-id']
+            await self._redis.xadd(key, MarmotAPIMessage().to_dict())
+        # remove whistlers if necessary
         key = _marmot_channel_whistlers(name)
+        whistlers = set(await self._redis.smembers(key))
+        for whistler in whistlers.difference(channel.whistlers):
+            await self.rem_whistler(name, whistler)
+        # add whistlers if necessary
         for whistler in channel.whistlers:
-            await self._redis.sadd(key, whistler)
+            await self.add_whistler(name, whistler)
         key = _marmot_channel_listeners(name)
+        # remove listeners if necessary
+        listeners = set(await self._redis.hkeys(key))
+        for listener in listeners.difference(channel.listeners):
+            await self.rem_listener(name, listener)
+        # add listeners if necessary
         for listener in channel.listeners:
-            count = await self._redis.hexists(key, listener)
-            if count == 1:
-                continue
-            await self._redis.hset(key, listener, last_message_id)
+            await self.add_listener(name, listener)
+        # ensure channel is registered
         await self._redis.sadd(KEY_MARMOT_CHANNELS, name)
 
-    async def del_channel(self, name: str):
+    async def rem_channel(self, name: str):
         """Delete a channel"""
+        # unregister channel
         await self._redis.srem(KEY_MARMOT_CHANNELS, name)
+        # delete channel stream
         await self._redis.delete(_marmot_channel_stream(name))
+        # delete channel's listeners structure
         await self._redis.delete(_marmot_channel_listeners(name))
+        # delete channel's whistlers structure
         await self._redis.delete(_marmot_channel_whistlers(name))
 
     async def add_listener(self, channel: str, listener: str):
@@ -107,7 +120,7 @@ class MarmotServerBackend:
         last_message_id = info['last-generated-id']
         await self._redis.hset(key, listener, last_message_id)
 
-    async def del_listener(self, channel: str, listener: str):
+    async def rem_listener(self, channel: str, listener: str):
         """Delete listener from channel"""
         await self._redis.hdel(_marmot_channel_listeners(channel), listener)
 
@@ -115,7 +128,7 @@ class MarmotServerBackend:
         """Add whistler to channel"""
         await self._redis.sadd(_marmot_channel_whistlers(channel), whistler)
 
-    async def del_whistler(self, channel: str, whistler: str):
+    async def rem_whistler(self, channel: str, whistler: str):
         """Delete whistler from channel"""
         await self._redis.srem(_marmot_channel_whistlers(channel), whistler)
 
@@ -164,8 +177,10 @@ class MarmotServerBackend:
                 minid = last_message_id
                 mincount = count
         if minid:
+            # if listeners trim up to the oldest unread message
             await self._redis.xtrim(key, minid=minid)
         else:
+            # if no listener at all trim all messages
             await self._redis.xtrim(key, maxlen=1)
         return mincount
 
@@ -181,17 +196,17 @@ class MarmotServerBackend:
         be_clients = set(await self._redis.hkeys(KEY_MARMOT_CLIENTS))
         be_channels = set(await self._redis.smembers(KEY_MARMOT_CHANNELS))
         # compute changes
-        clients_to_del = be_clients.difference(
+        clients_to_rem = be_clients.difference(
             set(fs_config.server.clients.keys())
         )
-        channels_to_del = be_channels.difference(
+        channels_to_rem = be_channels.difference(
             set(fs_config.server.channels.keys())
         )
         # apply changes
-        for channel_to_del in channels_to_del:
-            await self.del_channel(channel_to_del)
-        for client_to_del in clients_to_del:
-            await self.del_client(client_to_del)
+        for channel_to_rem in channels_to_rem:
+            await self.rem_channel(channel_to_rem)
+        for client_to_rem in clients_to_rem:
+            await self.rem_client(client_to_rem)
         for guid, pubkey in fs_config.server.clients.items():
             await self.add_client(guid, pubkey)
         for name, channel in fs_config.server.channels.items():

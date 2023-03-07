@@ -40,6 +40,15 @@ class MarmotMessage:
     level: MarmotMessageLevel = MarmotMessageLevel.INFO
     whistler: str = ''
 
+    def to_dict(self):
+        """Convert instance to dict"""
+        return {
+            'channel': self.channel,
+            'level': self.level.value,
+            'content': self.content,
+            'whistler': self.whistler,
+        }
+
 
 class Marmot:
     """Marmot"""

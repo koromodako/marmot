@@ -61,7 +61,7 @@ class MarmotChannelConfig:
         """Add whistler"""
         self.whistlers.add(guid)
 
-    def del_whistler(self, guid):
+    def rem_whistler(self, guid):
         """Delete whistler"""
         self.whistlers.discard(guid)
 
@@ -69,7 +69,7 @@ class MarmotChannelConfig:
         """Add listener"""
         self.listeners.add(guid)
 
-    def del_listener(self, guid):
+    def rem_listener(self, guid):
         """Delete listener"""
         self.listeners.discard(guid)
 
@@ -167,15 +167,15 @@ class MarmotServerConfig:
         pubkey = load_marmot_public_key(pubkey)
         self.clients[guid] = pubkey
 
-    def del_client(self, guid):
+    def rem_client(self, guid):
         """Delete client"""
         if guid not in self.clients:
-            LOGGER.warning("client does not exist, client deletion canceled.")
+            LOGGER.warning("client does not exist, client removal canceled.")
             return
         # remove client from channels
         for channel in self.channels.values():
-            channel.del_whistler(guid)
-            channel.del_listener(guid)
+            channel.rem_whistler(guid)
+            channel.rem_listener(guid)
         # remove client
         self.clients.pop(guid, None)
 
@@ -187,10 +187,10 @@ class MarmotServerConfig:
             return
         self.channels[channel] = MarmotChannelConfig()
 
-    def del_channel(self, channel):
+    def rem_channel(self, channel):
         """Delete channel"""
         if channel not in self.channels:
-            LOGGER.warning("client does not exist, client deletion canceled.")
+            LOGGER.warning("client does not exist, client removal canceled.")
             return
         self.channels.pop(channel, None)
 
@@ -206,12 +206,12 @@ class MarmotServerConfig:
             return
         channel.add_whistler(guid)
 
-    def del_whistler(self, channel, guid):
+    def rem_whistler(self, channel, guid):
         """Delete whistler"""
         channel = self.channels.get(channel)
         if not channel:
             return
-        channel.del_whistler(guid)
+        channel.rem_whistler(guid)
 
     def add_listener(self, channel, guid):
         """Add listener"""
@@ -225,12 +225,12 @@ class MarmotServerConfig:
             return
         channel.add_listener(guid)
 
-    def del_listener(self, channel, guid):
+    def rem_listener(self, channel, guid):
         """Delete listener"""
         channel = self.channels.get(channel)
         if not channel:
             return
-        channel.del_listener(guid)
+        channel.rem_listener(guid)
 
 
 @dataclass

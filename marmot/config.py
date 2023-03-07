@@ -237,11 +237,11 @@ async def _add_client(args):
     LOGGER.info("client added: %s", args.guid)
 
 
-async def _del_client(args):
+async def _rem_client(args):
     fs_config = _load_server_config(args.config)
-    fs_config.server.del_client(args.guid)
+    fs_config.server.rem_client(args.guid)
     fs_config.to_filepath(args.config)
-    LOGGER.info("client deleted: %s", args.guid)
+    LOGGER.info("client removed: %s", args.guid)
 
 
 async def _add_channel(args):
@@ -251,11 +251,11 @@ async def _add_channel(args):
     LOGGER.info("channel added: %s", args.channel)
 
 
-async def _del_channel(args):
+async def _rem_channel(args):
     fs_config = _load_server_config(args.config)
-    fs_config.server.del_channel(args.channel)
+    fs_config.server.rem_channel(args.channel)
     fs_config.to_filepath(args.config)
-    LOGGER.info("channel deleted: %s", args.channel)
+    LOGGER.info("channel removed: %s", args.channel)
 
 
 async def _add_whistler(args):
@@ -265,11 +265,11 @@ async def _add_whistler(args):
     LOGGER.info("whistler added: (%s, %s)", args.channel, args.guid)
 
 
-async def _del_whistler(args):
+async def _rem_whistler(args):
     fs_config = _load_server_config(args.config)
-    fs_config.server.del_whistler(args.channel, args.guid)
+    fs_config.server.rem_whistler(args.channel, args.guid)
     fs_config.to_filepath(args.config)
-    LOGGER.info("whistler deleted: (%s, %s)", args.channel, args.guid)
+    LOGGER.info("whistler removed: (%s, %s)", args.channel, args.guid)
 
 
 async def _add_listener(args):
@@ -279,11 +279,11 @@ async def _add_listener(args):
     LOGGER.info("listener added: (%s, %s)", args.channel, args.guid)
 
 
-async def _del_listener(args):
+async def _rem_listener(args):
     fs_config = _load_server_config(args.config)
-    fs_config.server.del_listener(args.channel, args.guid)
+    fs_config.server.rem_listener(args.channel, args.guid)
     fs_config.to_filepath(args.config)
-    LOGGER.info("listener deleted: (%s, %s)", args.channel, args.guid)
+    LOGGER.info("listener removed: (%s, %s)", args.channel, args.guid)
 
 
 async def _diff(args):
@@ -448,39 +448,39 @@ def _parse_args():
     add_client.add_argument('guid', help="guid of the client to add")
     add_client.add_argument('pubkey', help="public key of the client to add")
     add_client.set_defaults(async_func=_add_client)
-    del_client = cmd.add_parser('del-client', help="delete a client")
-    del_client.add_argument('guid', help="guid of the client to delete")
-    del_client.set_defaults(async_func=_del_client)
+    rem_client = cmd.add_parser('rem-client', help="remove a client")
+    rem_client.add_argument('guid', help="guid of the client to remove")
+    rem_client.set_defaults(async_func=_rem_client)
     add_channel = cmd.add_parser('add-channel', help="add a channel")
     add_channel.add_argument('channel', help="channel to add")
     add_channel.set_defaults(async_func=_add_channel)
-    del_channel = cmd.add_parser('del-channel', help="delete a channel")
-    del_channel.add_argument('channel', help="channel to delete")
-    del_channel.set_defaults(async_func=_del_channel)
+    rem_channel = cmd.add_parser('rem-channel', help="remove a channel")
+    rem_channel.add_argument('channel', help="channel to remove")
+    rem_channel.set_defaults(async_func=_rem_channel)
     add_whistler = cmd.add_parser(
         'add-whistler', help="add a whistler to a channel"
     )
     add_whistler.add_argument('channel', help="channel to update")
     add_whistler.add_argument('guid', help="guid of the whistler to add")
     add_whistler.set_defaults(async_func=_add_whistler)
-    del_whistler = cmd.add_parser(
-        'del-whistler', help="delete a whistler from a channel"
+    rem_whistler = cmd.add_parser(
+        'rem-whistler', help="remove a whistler from a channel"
     )
-    del_whistler.add_argument('channel', help="channel to update")
-    del_whistler.add_argument('guid', help="guid of the whistler to delete")
-    del_whistler.set_defaults(async_func=_del_whistler)
+    rem_whistler.add_argument('channel', help="channel to update")
+    rem_whistler.add_argument('guid', help="guid of the whistler to remove")
+    rem_whistler.set_defaults(async_func=_rem_whistler)
     add_listener = cmd.add_parser(
         'add-listener', help="add a listener to a channel"
     )
     add_listener.add_argument('channel', help="channel to update")
     add_listener.add_argument('guid', help="guid of the listener to add")
     add_listener.set_defaults(async_func=_add_listener)
-    del_listener = cmd.add_parser(
-        'del-listener', help="delete a listener from a channel"
+    rem_listener = cmd.add_parser(
+        'rem-listener', help="remove a listener from a channel"
     )
-    del_listener.add_argument('channel', help="channel to update")
-    del_listener.add_argument('guid', help="guid of the listener to delete")
-    del_listener.set_defaults(async_func=_del_listener)
+    rem_listener.add_argument('channel', help="channel to update")
+    rem_listener.add_argument('guid', help="guid of the listener to remove")
+    rem_listener.set_defaults(async_func=_rem_listener)
     diff = cmd.add_parser(
         'diff',
         help="show what will happen when fs config is pushed to backend",
