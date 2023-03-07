@@ -175,6 +175,10 @@ whistler fowards information from an untrusted source to the listeners through
 the marmot server.
 
 
+## Naming restrictions
+
+A client guid or channel name shall match `[a-z\d]+([_\-][a-z\d]+)*`.
+
 ## Testing
 
 No automated testing for now. Manual testing was performed using Python 3.10.6

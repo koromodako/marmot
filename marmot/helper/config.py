@@ -17,9 +17,8 @@ from .crypto import (
 from .logging import LOGGER
 
 
-GUID_PATTERN = re_compile(r'[a-z_\d\-]+')
-CHANNEL_PATTERN = re_compile(r'[a-z_]+(::[a-z_])*')
-
+CLIENT_PATTERN = re_compile(r'[a-z\d]+([_\-][a-z\d]+)*')
+CHANNEL_PATTERN = CLIENT_PATTERN
 
 DEFAULT_REDIS_URL = 'redis://localhost'
 DEFAULT_REDIS_MAXCONN = 50
@@ -104,14 +103,14 @@ class MarmotRedisConfig:
 
 
 def validate_guid(guid: str) -> str:
-    """Validate client guid against naming convention"""
-    if not GUID_PATTERN.fullmatch(guid):
+    """Validate client against naming convention"""
+    if not CLIENT_PATTERN.fullmatch(guid):
         raise MarmotConfigError("guid naming error!")
     return guid
 
 
 def validate_channel(channel: str) -> str:
-    """Validate channel name against naming convention"""
+    """Validate channel against naming convention"""
     if not CHANNEL_PATTERN.fullmatch(channel):
         raise MarmotConfigError("channel naming error!")
     return channel
