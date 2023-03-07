@@ -102,44 +102,67 @@ the server. This can be achieved pretty easily using `marmot-config` command.
 Docker setup itself is not covered here. These steps might reference `compose.yml`
 variables. All commands are relative to marmot directory cloned in step `01`.
 
-| Step | Description |
-|:----:|:------------|
-| `01`  | Clone this repository: `git clone https://github.com/koromodako/marmot` |
-| `02`  | Create a virtual environment: `python3 -m venv venv` |
-| `03`  | Activate virtual environment: `source venv/bin/activate` |
-| `04`  | Update pip to latest version: `python -m pip install -U pip` |
-| `05`  | Install marmot package: `python -m pip install .` |
-| `06`  | Install build package: `python -m pip install build` |
-| `07`  | Generate test certificate chain: `scripts/generate-test-cert-chain.py` |
-| `08`  | Generate test configuration files: `scripts/generate-test-config.py > /tmp/marmot-testing/clients-creds.unsafe` |
-| `09`  | Create `marmot-server` container persistent volume: `mkdir -p /data/services/marmot/server/data` |
-| `10`  | Copy `marmot-server` configuration file: `cp /tmp/marmot-testing/config/ms.json /data/services/marmot/server/data/marmot.json` |
-| `11`  | Create `marmot-redis` container persistent volume: `mkdir -p /data/services/marmot/redis/{etc,data}` |
-| `12`  | Instanciate redis configuration: `cp docker/redis/redis.conf /data/services/marmot/redis/etc/` |
-| `13`  | Customize redis configuration: `/data/services/marmot/redis/etc/redis.conf` |
-| `14`  | Create `marmot-nginx` container peristent volume: `mkdir -p /data/services/marmot/redis/etc` |
-| `15`  | Provide key pair: `/data/services/marmot/nginx/etc/api.marmot.org.{crt,key}.pem` |
-| `16`  | Generate DH parameters file: `openssl dhparam -out /data/services/marmot/nginx/etc/dhparam.pem 2048` |
-| `17`  | Instanciate nginx configuration: `cp docker/nginx/marmot.conf /data/services/marmot/nginx/etc/` |
-| `18`  | Customize nginx configuration: `/data/services/marmot/nginx/etc/marmot.conf` |
-| `19`  | Move to marmot docker directory: `cd docker/marmot` |
-| `20`  | Build docker image: `./build.sh` |
-| `21`  | Move up to docker directory: `cd ..` |
-| `22`  | Start docker deployment: `sudo docker compose up` |
-
+```bash
+# 01 - Clone this repository
+git clone https://github.com/koromodako/marmot && cd marmot
+# 02 - Create a virtual environment
+python3 -m venv venv
+# 03 - Activate virtual environment
+source venv/bin/activate
+# 04 - Update pip to latest version
+python -m pip install -U pip
+# 05 - Install marmot package
+python -m pip install .
+# 06 - Install build package
+python -m pip install build
+# 07 - Generate test certificate chain
+scripts/generate-test-cert-chain.py
+# 08 - Generate test configuration files
+scripts/generate-test-config.py > /tmp/marmot-testing/clients-creds.unsafe
+# 09 - Create `marmot-server` container persistent volume
+mkdir -p /data/services/marmot/server/data
+# 10 - Copy `marmot-server` configuration file
+cp /tmp/marmot-testing/config/ms.json /data/services/marmot/server/data/marmot.json
+# 11 - Create `marmot-redis` container persistent volume
+mkdir -p /data/services/marmot/redis/{etc,data}
+# 12 - Instanciate redis configuration
+cp docker/redis/redis.conf /data/services/marmot/redis/etc/
+# 13 - Customize redis configuration /data/services/marmot/redis/etc/redis.conf
+# 14 - Create `marmot-nginx` container peristent volume
+mkdir -p /data/services/marmot/nginx/etc
+# 15 - Provide key pair
+cp /tmp/marmot-testing/ssl/api.marmot.org.{crt,key}.pem /data/services/marmot/nginx/etc/
+# 16 - Generate DH parameters file
+openssl dhparam -out /data/services/marmot/nginx/etc/dhparam.pem 2048
+# 17 - Instanciate nginx configuration
+cp docker/nginx/marmot.conf /data/services/marmot/nginx/etc/
+# 18 - Customize nginx configuration /data/services/marmot/nginx/etc/marmot.conf
+# 19 - Move to marmot docker directory
+cd docker/marmot
+# 20 - Build docker image
+./build.sh
+# 21 - Move up to docker directory
+cd ..
+# 22 - Start docker deployment
+sudo docker compose up
+```
 
 ### Client
 
-| Step | Description |
-|:----:|:------------|
-| `01` | Create a virtual environment: `python3 -m venv venv` |
-| `02` | Activate virtual environment: `source venv/bin/activate` |
-| `03` | Setup marmot pakage: `python -m pip install git+https://github.com/koromodako/marmot` |
-| `04` | Initialize client configuration: `marmot-config init-client` |
-| `05` | Retrieve client information: `marmot-config show-client` |
-| `06` | Give your GUID and Public Key to the marmot server administrator |
-| `07` | The administrator will reply with marmot CA certificate |
-
+```bash
+# 01 - Create a virtual environment
+python3 -m venv venv
+# 02 - Activate virtual environment
+source venv/bin/activate
+# 03 - Setup marmot pakage
+python -m pip install git+https://github.com/koromodako/marmot
+# 04 - Initialize client configuration
+marmot-config init-client
+# 05 - Retrieve client information
+marmot-config show-client
+# 06 - Give your GUID and Public Key to the marmot server administrator
+# 07 - The administrator will reply with marmot CA certificate
+```
 
 ## Security
 
