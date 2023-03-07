@@ -147,6 +147,7 @@ cd ..
 sudo docker compose up
 ```
 
+
 ### Client
 
 ```bash
@@ -163,6 +164,7 @@ marmot-config show-client
 # 06 - Give your GUID and Public Key to the marmot server administrator
 # 07 - The administrator will reply with marmot CA certificate
 ```
+
 
 ## Security
 
