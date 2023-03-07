@@ -60,31 +60,35 @@ async def _listen(request):
     channels = list(sorted(channels))
     if not can_listen:
         LOGGER.warning(
-            "client unauthorized listen attempt: (%s, %s, %s)",
+            "client unauthorized listen attempt: (%s, %s, %s, %s)",
             guid,
             request.remote,
+            request.headers.get('X-Forwarded-For'),
             channels,
         )
         raise web.HTTPForbidden
     LOGGER.info(
-        "client is listening: (%s, %s, %s)",
+        "client is listening: (%s, %s, %s, %s)",
         guid,
         request.remote,
+        request.headers.get('X-Forwarded-For'),
         channels,
     )
     try:
         await _forward_messages_from(request, guid, channels)
         LOGGER.info(
-            "client connection closed: (%s, %s, %s)",
+            "server closed the connection: (%s, %s, %s, %s)",
             guid,
             request.remote,
+            request.headers.get('X-Forwarded-For'),
             channels,
         )
     except ConnectionResetError:
         LOGGER.info(
-            "client connection reset caught: (%s, %s, %s)",
+            "client closed the connection: (%s, %s, %s, %s)",
             guid,
             request.remote,
+            request.headers.get('X-Forwarded-For'),
             channels,
         )
 
@@ -105,17 +109,19 @@ async def _whistle(request):
         can_whistle = await backend.can_whistle(message)
         if not can_whistle:
             LOGGER.warning(
-                "client unauthorized whistle attempt: (%s, %s, %s)",
+                "client unauthorized whistle attempt: (%s, %s, %s, %s)",
                 message.whistler,
                 request.remote,
+                request.headers.get('X-Forwarded-For'),
                 message.channel,
             )
             published.append(False)
             continue
         LOGGER.info(
-            "client is whistling: (%s, %s, %s)",
+            "client is whistling: (%s, %s, %s, %s)",
             message.whistler,
             request.remote,
+            request.headers.get('X-Forwarded-For'),
             message.channel,
         )
         await backend.push(message)
