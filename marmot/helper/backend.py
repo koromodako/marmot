@@ -151,6 +151,7 @@ class MarmotServerBackend:
                 continue
             key = _marmot_channel_stream(channel)
             states[key] = last_message_id
+        # listener cannot read theses channels anymore
         if not states:
             yield None, None
             return
@@ -178,9 +179,11 @@ class MarmotServerBackend:
                 mincount = count
         if minid:
             # if listeners trim up to the oldest unread message
+            LOGGER.info("trim messages: (%s, %s)", channel, mincount)
             await self._redis.xtrim(key, minid=minid)
         else:
             # if no listener at all trim all messages
+            LOGGER.info("trim messages: (%s, all)", channel)
             await self._redis.xtrim(key, maxlen=1)
         return mincount
 
