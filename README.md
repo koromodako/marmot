@@ -83,7 +83,7 @@ JSON-encoded structures or anything you want as long as it is text it doesn't
 matter.
 
 Message level can be used to indicate the importance of the message, there are
-five harcoded levels CRITICAL, ERROR, WARNING, INFO and DEBUG.
+five harcoded levels `CRITICAL`, `ERROR`, `WARNING`, `INFO` and `DEBUG`.
 
 
 ### marmot-server
