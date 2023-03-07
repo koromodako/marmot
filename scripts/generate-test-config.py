@@ -67,7 +67,7 @@ def _parse_args():
         '--output-directory',
         '-o',
         type=Path,
-        default=Path('/tmp/marmot-testing/config'),
+        default=Path('/tmp/marmot-testing'),
         help="Output directory",
     )
     return parser.parse_args()
