@@ -172,17 +172,19 @@ def _parse_args():
         description="Generate test certificate chain including test CA certificate"
     )
     parser.add_argument(
-        '--common-name',
-        '-n',
-        default='api.marmot.org',
-        help="Certificate common name",
-    )
-    parser.add_argument(
         '--output-directory',
         '-o',
         type=Path,
         default=Path('/tmp/marmot-testing'),
         help="Output directory",
+    )
+    parser.add_argument(
+        '--common-names',
+        '-n',
+        metavar='CN',
+        nargs='+',
+        default=['api.marmot.org'],
+        help="Certificate common name",
     )
     return parser.parse_args()
 
@@ -193,8 +195,9 @@ def app():
     args.output_directory /= 'ssl'
     args.output_directory.mkdir(parents=True, exist_ok=True)
     ca_key, ca_crt = _generate_ca(args.output_directory)
-    csr = _generate_csr(args.common_name, args.output_directory)
-    _sign_csr(args.common_name, args.output_directory, csr, ca_key, ca_crt)
+    for common_name in args.common_names:
+        csr = _generate_csr(common_name, args.output_directory)
+        _sign_csr(common_name, args.output_directory, csr, ca_key, ca_crt)
 
 
 if __name__ == '__main__':

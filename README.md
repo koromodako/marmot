@@ -56,7 +56,16 @@ listeners and whistlers without having to restart the server.
 ### marmot-listen
 
 Marmot listener can listen to several channels to receive notifications from
-whistlers.
+whistlers. Server-side events (SSE) are received through a client-initiated TLS
+connection to the `marmot-server`.
+
+```
++---------------+                    +---------------+
+|               |-----[HTTP/TLS]---->|               |
+| marmot-listen |<=======[M|S]=======| marmot-server |
+|               |------------------->|               |
++---------------+                    +---------------+
+```
 
 `--executable` argument allow forward message properties to an third party
 executable using an interface based on environment variables. An example of such
@@ -72,11 +81,23 @@ Environment variables made available are described below.
 | `MARMOT_MSG_WHISTLER` | GUID of the whistler sending the message |
 | `MARMOT_MSG_CONTENT`  | Content of the message |
 
+With `--secret-provider env` option, `marmot-listen` will try to get the private
+key secret from `MARMOT_PK_SECRET` environment variable.
+
 
 ### marmot-whistle
 
 Marmot whistlers can whistle to a specific channel to send notifications to
-listeners.
+listeners. HTTP POST requests are sent through a client-initiated TLS
+connection to the `marmot-server`.
+
+```
++----------------+                    +---------------+
+|                |-----[HTTP/TLS]---->|               |
+| marmot-whistle |========[M|S]======>| marmot-server |
+|                |------------------->|               |
++----------------+                    +---------------+
+```
 
 Message content is processed as text, you can send base64-encoded binary data,
 JSON-encoded structures or anything you want as long as it is text it doesn't
@@ -84,6 +105,31 @@ matter.
 
 Message level can be used to indicate the importance of the message, there are
 five harcoded levels `CRITICAL`, `ERROR`, `WARNING`, `INFO` and `DEBUG`.
+
+With `--secret-provider env` option, `marmot-whistle` will try to get the private
+key secret from `MARMOT_PK_SECRET` environment variable.
+
+
+### marmot-relay
+
+A marmot relay plays the role of listener and whistler at the same time except
+that it works with two marmot servers at the same time. It listens to one or
+more channels from a source server and forwards whistles in the exact same
+channels in the destination server.
+
+```
++---------------+                +--------------+                +---------------+
+|               |<--[HTTP/TLS]---|              |---[HTTP/TLS]-->|               |
+| marmot-server |======[M|S]====>| marmot-relay |======[M|S]====>| marmot-server |
+|    (source)   |<---------------|              |--------------->| (destination) |
++---------------+                +--------------+                +---------------+
+```
+
+`marmot-relay` allows upper tier networks to receive messages from lower tier
+networks using a "pull w/o polling" approach.
+
+With `--secret-provider env` option, `marmot-whistle` will try to get the private
+key secret from `MARMOT_PK_SECRET` environment variable.
 
 
 ### marmot-server
@@ -93,6 +139,14 @@ to forward messages between clients.  It uses Redis Streams to keep a log of
 messages to distribute to channel listeners. It also uses Redis to store parts
 of its configuration that the administrator can update without having to restart
 the server. This can be achieved pretty easily using `marmot-config` command.
+
+```
++----------------+                +---------------+                +---------------+
+|                |---[HTTP/TLS]-->|               |<--[HTTP/TLS]---|               |
+| marmot-whistle |======[M|S]====>| marmot-server |======[M|S]====>| marmot-listen |
+|                |--------------->|               |<---------------|               |
++----------------+                +---------------+                +---------------+
+```
 
 
 ## Setup
@@ -204,10 +258,21 @@ the marmot server.
 
 A client guid or channel name shall match `[a-z\d]+([_\-][a-z\d]+)*`.
 
-## Testing
+
+## Limitations
+
+Marmot does not implement E2E message authentication. The server authenticates
+messages before adding them to the channel stream but listeners does not
+authenticate messages it receives.
+
+Marmot does not implement E2E message encryption at all.
+
+These features could be implemented in the future.
 
 No automated testing for now. Manual testing was performed using Python 3.10.6
 on Ubuntu 22.04.2 LTS. Assume all Python versions above 3.9 are supported.
+
+No stress test was attempted to push marmot to its limits.
 
 
 ## Coding rules

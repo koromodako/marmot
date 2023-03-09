@@ -66,8 +66,6 @@ def _parse_args():
         help=f"marmot secret provider, one of {{{','.join(SECRET_PROVIDERS)}}}",
     )
     parser.add_argument('--json', action='store_true', help="JSON output")
-    parser.add_argument('--host', help="marmot server host")
-    parser.add_argument('--port', type=int, help="marmot server port")
     parser.add_argument(
         '--level',
         '-l',
