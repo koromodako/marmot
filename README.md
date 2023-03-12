@@ -69,8 +69,8 @@ connection to the `marmot-server`.
 
 `--executable` argument allow forward message properties to an third party
 executable using an interface based on environment variables. An example of such
-executable is `example/whistler-script.sh`. File permissions shall allow the user running
-`marmot-listen` to execute the file.
+executable is `example/marmot-whistler-debug.sh`. File permissions shall allow
+the user running `marmot-listen` to execute the file.
 
 Environment variables made available are described below.
 
