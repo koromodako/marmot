@@ -1,9 +1,64 @@
+[project]
+name = "marmot"
+readme = "README.md"
+license = {file = "LICENSE"}
+keywords = ["marmot", "api", "cli", "asyncio"]
+description = "Marmot is a security-oriented server-based notification system including a pub/sub client"
+requires-python = ">=3.10"
+dynamic = ["version"]
+authors = [
+  { name="koromodako", email="koromodako@gmail.com" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Security",
+    "Topic :: Communications",
+    "Topic :: System :: Monitoring",
+]
+dependencies = [
+    "rich~=12.6",
+    "redis~=4.6",
+    "aiohttp~=3.8",
+    "aiohttp-sse~=2.1",
+    "cryptography~=39.0",
+]
+
+
+[project.urls]
+"Homepage" = "https://github.com/koromodako/marmot"
+"Repository" = "https://github.com/koromodako/marmot"
+"Bug Tracker" = "https://github.com/koromodako/marmot/issues"
+
+
+[project.scripts]
+"marmot-config" = "marmot.config:app"
+"marmot-server" = "marmot.server:app"
+"marmot-listen" = "marmot.listen:app"
+"marmot-whistle" = "marmot.whistle:app"
+"marmot-relay" = "marmot.relay:app"
+
+
 [build-system]
-requires = ["setuptools>=30.3.0", "wheel", "setuptools_scm[toml]>=3.4"]
+requires = ["setuptools>=68", "setuptools_scm>=8.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["marmot", "marmot.*"]
+
+
+[tool.setuptools_scm]
+version_file = "marmot/__version__.py"
+
 
 [tool.black]
 line-length = 79
 skip-string-normalization = true
-
-[tool.setuptools_scm]
-write_to = "marmot/__version__.py"

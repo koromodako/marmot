@@ -2,7 +2,7 @@
 set -e
 echo "building marmot package..."
 rm -f ../../dist/* packages/*
-../../venv/bin/python -m build ../../
+../../venv/bin/python -m build -w ../../
 cp ../../dist/*.whl packages/
 echo "invoking docker build..."
 sudo DOCKER_BUILDKIT=1 docker build -t marmot:latest .
